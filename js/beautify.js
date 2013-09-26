@@ -9,13 +9,14 @@
   fs.readFile(process.argv[2], {
     encoding: "utf8"
   }, function(err, data) {
-    var p, sts, tokens;
+    var manager, p, sts, tokens;
     if (err != null) {
       throw err;
     }
     p = new parser.JSParser;
     sts = p.parse(data);
-    tokens = sts.tokenize();
+    manager = new parser.TokenizeManager;
+    tokens = sts.tokenize(manager);
     return console.log(tokens.toString());
   });
 

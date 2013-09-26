@@ -1122,7 +1122,7 @@ Token.prototype.toHTML=function(){return this.value};
 Token.prototype.equal=function(type,value){
 	return this instanceof type && this.value==value;
 };
-Token.prototype.tokenize=function(){return new TokenList(this)};
+Token.prototype.tokenize=function(manager){return new TokenList(this)};
 
 //ダミー
 function UndefinedToken(v){
@@ -1194,12 +1194,13 @@ KeywordToken.prototype=Object.create(Token.prototype);
 KeywordToken.prototype.toHTML=function(){
 	return "<span class='token keyword'>"+this.value+"</span>";
 };
-KeywordToken.prototype.tokenize=function(){
+KeywordToken.prototype.tokenize=function(manager){
+	var ret=new TokenList(this);
 	if(this.value=="new"){
-		return new TokenList(this,new WhiteSpaceToken(" "));
+		ret.push(manager.just());
 	}
-	return new TokenList(this);
-}
+	return ret;
+};
 function FutureReservedWordToken(v){
 	Token.apply(this,arguments);
 }
@@ -1213,9 +1214,9 @@ function Statements(){
 	Array.apply(this,arguments);
 }
 Statements.prototype=Object.create(Array.prototype);
-Statements.prototype.tokenize=function(){
+Statements.prototype.tokenize=function(manager){
 	var ret=new TokenList();
-	this.forEach(function(x){ret=ret.concat(x.tokenize())});
+	this.forEach(function(x){ret=ret.concat(x.tokenize(manager))});
 	
 	return ret;
 }
@@ -1230,12 +1231,12 @@ function FunctionDeclaration(){
 	this.paramlist=null;	//[Identifier]
 	this.functionbody=null;	//SourceElements
 }
-FunctionDeclaration.prototype.tokenize=function(){
+FunctionDeclaration.prototype.tokenize=function(manager){
 	var ret=new TokenList(
 		new KeywordToken("function")
 	);
 	if(this.name){
-		ret.push(new WhiteSpaceToken(" "));
+		ret.push(manager.just());
 		ret.push(this.name);
 	}
 	ret.push(
@@ -1245,12 +1246,12 @@ FunctionDeclaration.prototype.tokenize=function(){
 	ret.push(
 		new PunctuatorToken(")"),
 		new PunctuatorToken("{"),
-		new LineTerminatorToken("\n")
+		manager.newline()
 	);
-	ret=ret.concat(Indent(this.functionbody.tokenize()));
+	ret=ret.concat(manager.indent(this.functionbody.tokenize(manager)));
 	ret.push(
 		new PunctuatorToken("}"),
-		new LineTerminatorToken("\n")
+		manager.newline()
 	);
 	return ret;
 }
@@ -1258,12 +1259,12 @@ function FunctionExpression(){
 	FunctionDeclaration.apply(this);
 }
 FunctionExpression.prototype=Object.create(FunctionDeclaration.prototype);
-FunctionDeclaration.prototype.tokenize=function(){
+FunctionDeclaration.prototype.tokenize=function(manager){
 	var ret=new TokenList(
 		new KeywordToken("function")
 	);
 	if(this.name){
-		ret.push(new WhiteSpaceToken(" "));
+		ret.push(manager.just());
 		ret.push(this.name);
 	}
 	ret.push(
@@ -1273,9 +1274,9 @@ FunctionDeclaration.prototype.tokenize=function(){
 	ret.push(
 		new PunctuatorToken(")"),
 		new PunctuatorToken("{"),
-		new LineTerminatorToken("\n")
+		manager.newline()
 	);
-	ret=ret.concat(Indent(this.functionbody.tokenize()));
+	ret=ret.concat(manager.indent(this.functionbody.tokenize(manager)));
 	ret.push(
 		new PunctuatorToken("}")
 	);
@@ -1289,13 +1290,13 @@ function Arguments(){
 	Array.apply(this,arguments);
 }
 Arguments.prototype=Object.create(Array.prototype);
-Arguments.prototype.tokenize=function(){
+Arguments.prototype.tokenize=function(manager){
 	var ret=new TokenList(new PunctuatorToken("("));
 	var ret2=new TokenList();
 	this.forEach(function(x){
-		ret2=ret2.concat(x.tokenize());
+		ret2=ret2.concat(x.tokenize(manager));
 	});
-	ret=ret.concat(new TokenList(Joinarr(this.map(function(x){return x.tokenize()}),new PunctuatorToken(","))).flatten());
+	ret=ret.concat(new TokenList(Joinarr(this.map(function(x){return x.tokenize(manager)}),new PunctuatorToken(","))).flatten());
 	ret.push(new PunctuatorToken(")"));
 	return ret;
 }
@@ -1307,39 +1308,39 @@ function BlockStatement(){
 	this.statements=new Statements();
 }
 BlockStatement.prototype=Object.create(Statement.prototype);
-BlockStatement.prototype.tokenize=function(){
-	return new TokenList(new PunctuatorToken("{"),new LineTerminatorToken("\n")).concat(Indent(this.statements.tokenize()))
-			     .concat([new PunctuatorToken("}"),new LineTerminatorToken("\n")]);
+BlockStatement.prototype.tokenize=function(manager){
+	return new TokenList(new PunctuatorToken("{"),manager.newline()).concat(manager.indent(this.statements.tokenize(manager)))
+			     .concat([new PunctuatorToken("}"),manager.newline()]);
 }
 function VariableStatement(){
 	this.variables=[];
 	//[Identifier,AssignmentExpression] ( Identifier = AssignmentExpression)
 }
 VariableStatement.prototype=Object.create(Statement.prototype);
-VariableStatement.prototype.tokenize=function(){
-	var ret=new TokenList(new KeywordToken("var"),new WhiteSpaceToken(" "));
+VariableStatement.prototype.tokenize=function(manager){
+	var ret=new TokenList(new KeywordToken("var"),manager.just());
 	this.variables.forEach(function(x,i){
 		if(i>0)ret.push(new PunctuatorToken(","));
 		ret.push(x[0]);
-		if(x[1])ret.push(new PunctuatorToken("=")),ret=ret.concat(x[1].tokenize());
+		if(x[1])ret.push(new PunctuatorToken("=")),ret=ret.concat(x[1].tokenize(manager));
 	});
-	ret.push(new PunctuatorToken(";"),new LineTerminatorToken("\n"));
+	ret.push(new PunctuatorToken(";"),manager.newline());
 	return ret;
 }
 
 function EmptyStatement(){
 }
 EmptyStatement.prototype=Object.create(Statement.prototype);
-EmptyStatement.prototype.tokenize=function(){
-	return new TokenList(new PunctuatorToken(";"),new LineTerminatorToken("\n"));
+EmptyStatement.prototype.tokenize=function(manager){
+	return new TokenList(new PunctuatorToken(";"),manager.newline());
 }
 
 function ExpressionStatement(){
 	this.exp=null;	//Expression
 }
 ExpressionStatement.prototype=Object.create(Statement.prototype);
-ExpressionStatement.prototype.tokenize=function(){
-	return this.exp.tokenize().concat([new PunctuatorToken(";"),new LineTerminatorToken("\n")]);
+ExpressionStatement.prototype.tokenize=function(manager){
+	return this.exp.tokenize(manager).concat([new PunctuatorToken(";"),manager.newline()]);
 }
 
 function IfStatement(){
@@ -1348,14 +1349,14 @@ function IfStatement(){
 	this.elsestatement=null;//elseのステートメント（nullならelseはない）
 }
 IfStatement.prototype=Object.create(Statement.prototype);
-IfStatement.prototype.tokenize=function(){
+IfStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("if"),new PunctuatorToken("("));
-	ret=ret.concat(this.condition.tokenize());
+	ret=ret.concat(this.condition.tokenize(manager));
 	ret.push(new PunctuatorToken(")"));
-	ret=ret.concat(this.truestatement.tokenize());
+	ret=ret.concat(this.truestatement.tokenize(manager));
 	if(this.elsestatement){
 		ret.push(new KeywordToken("else"));
-		ret=ret.concat(this.elsestatement.tokenize());
+		ret=ret.concat(manager.split(this.elsestatement.tokenize(manager)));
 	}
 	return ret;
 }
@@ -1369,12 +1370,12 @@ function Do_WhileStatement(){
 	this.statement=null;	//Statement
 }
 Do_WhileStatement.prototype=Object.create(IterationStatement.prototype);
-Do_WhileStatement.prototype.tokenize=function(){
+Do_WhileStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("do"));
-	ret=ret.concat(this.statement.tokenize());
+	ret=ret.concat(manager.split(this.statement.tokenize(manager)));
 	ret.push(new KeywordToken("while"),new PunctuatorToken("("));
-	ret=ret.concat(this.condition.tokenize());
-	ret.push(new PunctuatorToken(")"),new PunctuatorToken(";"),new LineTerminatorToken("\n"));
+	ret=ret.concat(this.condition.tokenize(manager));
+	ret.push(new PunctuatorToken(")"),new PunctuatorToken(";"),manager.newline());
 	return ret;
 	
 }
@@ -1383,11 +1384,11 @@ function WhileStatement(){
 	this.statement=null;	//Statement
 }
 WhileStatement.prototype=Object.create(IterationStatement.prototype);
-WhileStatement.prototype.tokenize=function(){
+WhileStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("while"),new PunctuatorToken("("));
-	ret=ret.concat(this.condition.tokenize());
+	ret=ret.concat(this.condition.tokenize(manager));
 	ret.push(new PunctuatorToken(")"));
-	ret=ret.concat(this.statement.tokenize());
+	ret=ret.concat(this.statement.tokenize(manager));
 	return ret;
 	
 }
@@ -1397,15 +1398,15 @@ function ForStatement(){
 	this.statement=null;	//Statement
 }
 ForStatement.prototype=Object.create(IterationStatement.prototype);
-ForStatement.prototype.tokenize=function(){
+ForStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("for"),new PunctuatorToken("("));
-	if(this.exp1)ret=ret.concat(this.exp1.tokenize());
+	if(this.exp1)ret=ret.concat(this.exp1.tokenize(manager));
 	ret.push(new PunctuatorToken(";"));
-	if(this.exp2)ret=ret.concat(this.exp2.tokenize());
+	if(this.exp2)ret=ret.concat(this.exp2.tokenize(manager));
 	ret.push(new PunctuatorToken(";"));
-	if(this.exp3)ret=ret.concat(this.exp3.tokenize());
+	if(this.exp3)ret=ret.concat(this.exp3.tokenize(manager));
 	ret.push(new PunctuatorToken(")"));
-	ret=ret.concat(this.statement.tokenize());
+	ret=ret.concat(this.statement.tokenize(manager));
 	return ret;
 }
 
@@ -1415,19 +1416,19 @@ function For_VarStatement(){
 	this.statement=null;	//Statement
 }
 For_VarStatement.prototype=Object.create(IterationStatement.prototype);
-For_VarStatement.prototype.tokenize=function(){
-	var ret=new TokenList(new KeywordToken("for"),new PunctuatorToken("("),new KeywordToken("var"),new WhiteSpaceToken(" "));
+For_VarStatement.prototype.tokenize=function(manager){
+	var ret=new TokenList(new KeywordToken("for"),new PunctuatorToken("("),new KeywordToken("var"),manager.just());
 	this.variables.forEach(function(x,i){
 		if(i>0)ret.push(new PunctuatorToken(","));
 		ret.push(x[0]);
-		if(x[1])ret.push(new PunctuatorToken("=")),ret=ret.concat(x[1].tokenize());
+		if(x[1])ret.push(new PunctuatorToken("=")),ret=ret.concat(x[1].tokenize(manager));
 	});
 	ret.push(new PunctuatorToken(";"));
-	if(this.exp2)ret=ret.concat(this.exp2.tokenize());
+	if(this.exp2)ret=ret.concat(this.exp2.tokenize(manager));
 	ret.push(new PunctuatorToken(";"));
-	if(this.exp3)ret=ret.concat(this.exp3.tokenize());
+	if(this.exp3)ret=ret.concat(this.exp3.tokenize(manager));
 	ret.push(new PunctuatorToken(")"));
-	ret=ret.concat(this.statement.tokenize());
+	ret=ret.concat(this.statement.tokenize(manager));
 	return ret;
 }
 
@@ -1436,13 +1437,13 @@ function For_InStatement(){
 	this.statement=null;	//Statement
 }
 For_InStatement.prototype=Object.create(IterationStatement.prototype);
-For_InStatement.prototype.tokenize=function(){
+For_InStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("for"),new PunctuatorToken("("));
-	ret=ret.concat(this.exp1.tokenize());
-	ret.push(new WhiteSpaceToken(" "),new KeywordToken("in"),new WhiteSpaceToken(" "));
-	ret=ret.concat(this.exp2.tokenize());
+	ret=ret.concat(this.exp1.tokenize(manager));
+	ret.push(manager.just(),new KeywordToken("in"),manager.just());
+	ret=ret.concat(this.exp2.tokenize(manager));
 	ret.push(new PunctuatorToken(")"));
-	ret=ret.concat(this.statement.tokenize());
+	ret=ret.concat(this.statement.tokenize(manager));
 	return ret;
 }
 
@@ -1453,17 +1454,17 @@ function For_In_VarStatement(){
 	this.statement=null;	//Statement
 }
 For_In_VarStatement.prototype=Object.create(IterationStatement.prototype);
-For_In_VarStatement.prototype.tokenize=function(){
-	var ret=new TokenList(new KeywordToken("for"),new PunctuatorToken("("),new KeywordToken("var"),new WhiteSpaceToken(" "));
+For_In_VarStatement.prototype.tokenize=function(manager){
+	var ret=new TokenList(new KeywordToken("for"),new PunctuatorToken("("),new KeywordToken("var"),manager.just());
 	this.variables.forEach(function(x,i){
 		if(i>0)ret.push(new PunctuatorToken(","));
 		ret.push(x[0]);
-		if(x[1])ret.push(new PunctuatorToken("=")),ret=ret.concat(x[1].tokenize());
+		if(x[1])ret.push(new PunctuatorToken("=")),ret=ret.concat(x[1].tokenize(manager));
 	});
-	ret.push(new WhiteSpaceToken(" "),new KeywordToken("in"),new WhiteSpaceToken(" "));
-	ret=ret.concat(this.exp2.tokenize());
+	ret.push(manager.just(),new KeywordToken("in"),manager.just());
+	ret=ret.concat(this.exp2.tokenize(manager));
 	ret.push(new PunctuatorToken(")"));
-	ret=ret.concat(this.statement.tokenize());
+	ret=ret.concat(this.statement.tokenize(manager));
 	return ret;
 }
 
@@ -1471,12 +1472,12 @@ function ContinueStatement(){
 	this.identifier=null;
 }
 ContinueStatement.prototype=Object.create(Statement.prototype);
-ContinueStatement.prototype.tokenize=function(){
+ContinueStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("continue"));
 	if(this.identifier){
-		ret.push(new WhiteSpaceToken(" "),this.identifier);
+		ret.push(manager.just(),this.identifier);
 	}
-	ret.push(new PunctuatorToken(";"),new LineTerminatorToken("\n"));
+	ret.push(new PunctuatorToken(";"),manager.newline());
 	return ret;
 }
 
@@ -1484,12 +1485,12 @@ function BreakStatement(){
 	this.identifier=null;
 }
 BreakStatement.prototype=Object.create(Statement.prototype);
-BreakStatement.prototype.tokenize=function(){
+BreakStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("break"));
 	if(this.identifier){
-		ret.push(new WhiteSpaceToken(" "),this.identifier);
+		ret.push(manager.just(),this.identifier);
 	}
-	ret.push(new PunctuatorToken(";"),new LineTerminatorToken("\n"));
+	ret.push(new PunctuatorToken(";"),manager.newline());
 	return ret;
 }
 
@@ -1497,13 +1498,13 @@ function ReturnStatement(){
 	this.exp=null;
 }
 ReturnStatement.prototype=Object.create(Statement.prototype);
-ReturnStatement.prototype.tokenize=function(){
+ReturnStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("return"));
 	if(this.exp){
-		ret.push(new WhiteSpaceToken(" "));
-		ret=ret.concat(this.exp.tokenize());
+		ret.push(manager.just());
+		ret=ret.concat(this.exp.tokenize(manager));
 	}
-	ret.push(new PunctuatorToken(";"),new LineTerminatorToken("\n"));
+	ret.push(new PunctuatorToken(";"),manager.newline());
 	return ret;
 }
 
@@ -1512,9 +1513,9 @@ function WithStatement(){
 	this.statement=null;
 }
 WithStatement.prototype=Object.create(Statement.prototype);
-WithStatement.prototype.tokenize=function(){
+WithStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("with"),new PunctuatorToken("("));
-	ret=ret.concat(this.exp.tokenize()).concat(new PunctuatorToken(")")).concat(this.statement.tokenize());
+	ret=ret.concat(this.exp.tokenize(manager)).concat(new PunctuatorToken(")")).concat(this.statement.tokenize(manager));
 	return ret;
 }
 
@@ -1524,23 +1525,23 @@ function SwitchStatement(){
 	//[Expression,Statements, mode] //modeがtrue→Expressionはnull.default
 }
 SwitchStatement.prototype=Object.create(Statement.prototype);
-SwitchStatement.prototype.tokenize=function(){
+SwitchStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("switch"),new PunctuatorToken("("));
-	ret=ret.concat(this.exp.tokenize());
-	ret.push(new PunctuatorToken(")"),new PunctuatorToken("{"),new LineTerminatorToken("\n"));
+	ret=ret.concat(this.exp.tokenize(manager));
+	ret.push(new PunctuatorToken(")"),new PunctuatorToken("{"),manager.newline());
 	this.cases.forEach(function(x){
 		if(x[2]){
 			//default
-			ret.push(new KeywordToken("default"),new PunctuatorToken(":"),new LineTerminatorToken("\n"));
-			ret=ret.concat(Indent(x[1].tokenize()));
+			ret.push(new KeywordToken("default"),new PunctuatorToken(":"),manager.newline());
+			ret=ret.concat(manager.indent(x[1].tokenize(manager)));
 		}else{
-			ret.push(new KeywordToken("case"),new WhiteSpaceToken(" "));
-			ret=ret.concat(x[0].tokenize());
-			ret.push(new PunctuatorToken(":"),new LineTerminatorToken("\n"));
-			ret=ret.concat(Indent(x[1].tokenize()));
+			ret.push(new KeywordToken("case"),manager.just());
+			ret=ret.concat(x[0].tokenize(manager));
+			ret.push(new PunctuatorToken(":"),manager.newline());
+			ret=ret.concat(manager.indent(x[1].tokenize(manager)));
 		}
 	});
-	ret.push(new PunctuatorToken("}"),new LineTerminatorToken("\n"));
+	ret.push(new PunctuatorToken("}"),manager.newline());
 	return ret;
 }
 
@@ -1549,16 +1550,16 @@ function LabelledStatement(){
 	this.statement=null;
 }
 LabelledStatement.prototype=Object.create(Statement.prototype);
-LabelledStatement.prototype.tokenize=function(){
-	return new TokenList([this.identifier,new PunctuatorToken(":"),new WhiteSpaceToken(" ")].concat(this.statement.tokenize()));
+LabelledStatement.prototype.tokenize=function(manager){
+	return new TokenList([this.identifier,new PunctuatorToken(":"),manager.just()].concat(this.statement.tokenize(manager)));
 }
 
 function ThrowStatement(){
 	this.exp=null;
 }
 ThrowStatement.prototype=Object.create(Statement.prototype);
-ThrowStatement.prototype.tokenize=function(){
-	return new TokenList([new KeywordToken("throw"),new WhiteSpaceToken(" ")].concat(this.exp.tokenize()));
+ThrowStatement.prototype.tokenize=function(manager){
+	return new TokenList([new KeywordToken("throw"),manager.just()].concat(this.exp.tokenize(manager)));
 }
 
 function TryStatement(){
@@ -1568,16 +1569,16 @@ function TryStatement(){
 	this.finallyblock=null;	//BlockStatement / null
 }
 TryStatement.prototype=Object.create(Statement.prototype);
-TryStatement.prototype.tokenize=function(){
+TryStatement.prototype.tokenize=function(manager){
 	var ret=new TokenList(new KeywordToken("try"));
-	ret=ret.concat(this.block.tokenize());
+	ret=ret.concat(manager.split(this.block.tokenize(manager)));
 	if(this.catchblock){
 		ret.push(new KeywordToken("catch"),new PunctuatorToken("("),this.catchidentifier,new PunctuatorToken(")"));
-		ret=ret.concat(this.catchblock.tokenize());
+		ret=ret.concat(this.catchblock.tokenize(manager));
 	}
 	if(this.finallyblock){
 		ret.push(new KeywordToken("finally"));
-		ret=ret.concat(this.finallyblock.tokenize());
+		ret=ret.concat(manager.split(this.finallyblock.tokenize(manager)));
 	}
 	return ret;
 }
@@ -1585,20 +1586,10 @@ TryStatement.prototype.tokenize=function(){
 function DebuggerStatement(){
 }
 DebuggerStatement.prototype=Object.create(Statement.prototype);
-DebuggerStatement.prototype.tokeinze=function(){
+DebuggerStatement.prototype.tokenize=function(manager){
 	return new TokenList(new KeywordToken("debugger"),new PunctuatorToken(";"));
 }
 
-function Indent(tokens){
-	var ret=new TokenList();
-	var flg=true;
-	tokens.forEach(function(x){
-		if(flg)ret.push(new WhiteSpaceToken("\t")),flg=false;
-		if(x instanceof LineTerminatorToken)flg=true;
-		ret.push(x);
-	});
-	return ret;
-}
 function Joinarr(tokens,sep){
 	var ret=new TokenList();
 	var sep=sep instanceof Function? sep() : sep;
@@ -1618,11 +1609,11 @@ function Expression(){
 	//Expression,Tokenからなる
 	this.parts=[];
 }
-Expression.prototype.tokenize=function(){
+Expression.prototype.tokenize=function(manager){
 	var ret=new TokenList();
 	this.parts.forEach(function(x){
 		if(x.tokenize){
-			ret=ret.concat(x.tokenize());
+			ret=ret.concat(x.tokenize(manager));
 		}else{
 			ret.push(x);
 		}
@@ -1634,9 +1625,9 @@ function ArrayLiteral(){
 	//partsには各ExpressionとToken , を代入
 }
 ArrayLiteral.prototype=Object.create(Expression.prototype);
-ArrayLiteral.prototype.tokenize=function(){
+ArrayLiteral.prototype.tokenize=function(manager){
 	return new TokenList([new PunctuatorToken("[")]
-			     .concat(Expression.prototype.tokenize.apply(this))
+			     .concat(Expression.prototype.tokenize.call(this,manager))
 			     .concat(new PunctuatorToken("]")));
 }
 function ObjectLiteral(){
@@ -1646,24 +1637,53 @@ function ObjectLiteral(){
 	//get/setの場合、式はFunctionDeclartion
 }
 ObjectLiteral.prototype=Object.create(Expression.prototype);
-ObjectLiteral.prototype.tokenize=function(){
-	var ret=new TokenList(new PunctuatorToken("{"),new LineTerminatorToken("\n"));
+ObjectLiteral.prototype.tokenize=function(manager){
+	var ret=new TokenList(new PunctuatorToken("{"),manager.newline());
 	if(this.properties.length>0){
-		ret=ret.concat(Indent(this.properties.map(function(x){
+		ret=ret.concat(manager.indent(this.properties.map(function(x){
 			if(x[2]){
-				var ret2=x[1].tokenize();
+				var ret2=x[1].tokenize(manager);
 				ret2.shift();	//function を取り除く
 				ret2.unshift(new KeywordToken(x[2]));
 				return ret2;
 			}
-			return [x[0],new PunctuatorToken(":"),].concat(x[1].tokenize());
+			return [x[0],new PunctuatorToken(":"),].concat(x[1].tokenize(manager));
 		}).reduce(function(p,c){
-			return p.concat([new PunctuatorToken(","),new LineTerminatorToken("\n")]).concat(c);
+			return p.concat([new PunctuatorToken(","),manager.newline()]).concat(c);
 		})));
 	}
-	ret=ret.concat([new LineTerminatorToken("\n"),new PunctuatorToken("}")]);
+	ret=ret.concat([manager.newline(),new PunctuatorToken("}")]);
 	return ret;
 }
  
+//--- トークナイズ用マネージャ
+function TokenizeManager(){
+}
+TokenizeManager.prototype.just=function(){
+	return new WhiteSpaceToken(" ");
+};
+TokenizeManager.prototype.split=function(tokenlist){
+	//最初がIdentifierならスペースを入れないとだめ
+	var first=tokenlist[0];
+	if((first instanceof IdentifierToken)||(first instanceof LiteralToken)||(first instanceof KeywordToken)||(first instanceof FutureReservedWordToken)){
+		tokenlist.unshift(this.just());
+	}
+	return tokenlist;
+};
+TokenizeManager.prototype.indent=function(tokenlist){
+	var ret=new TokenList();
+	var flg=true;
+	tokenlist.forEach(function(x){
+		if(flg)ret.push(new WhiteSpaceToken("\t")),flg=false;
+		if(x instanceof LineTerminatorToken)flg=true;
+		ret.push(x);
+	});
+	return ret;
+};
+TokenizeManager.prototype.newline=function(){
+	return new LineTerminatorToken("\n");
+};
+//
 //エクスポーーーーーーート
 exports.JSParser=JSParser;
+exports.TokenizeManager=TokenizeManager;

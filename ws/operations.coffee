@@ -286,44 +286,57 @@ exports.Parser=class Parser
                 @readChar check
         @readChar check
                
-    # テーブル
-    opsTable:
-        " ":#Stack Manipulation
-            " ":ops.stack.Push
-            "\t":
-                " ":ops.stack.Copy
-                "\n":ops.stack.Slide
-            "\n":
-                " ":ops.stack.Duplicate
-                "\t":ops.stack.Swap
-                "\n":ops.stack.Discard
+# テーブル
+opsTable=
+    " ":#Stack Manipulation
+        " ":ops.stack.Push
         "\t":
-            " ":#Arithmetic
-                " ":
-                    " ":ops.arithmetic.Add
-                    "\t":ops.arithmetic.Subtract
-                    "\n":ops.arithmetic.Multiply
-                "\t":
-                    " ":ops.arithmetic.Divide
-                    "\t":ops.arithmetic.Modulo
-            "\t":#Heap Access
-                " ":ops.heap.Store
-                "\t":ops.heap.Retrieve
-            "\n":#IO
-                " ":
-                    " ":ops.io.OutputChar
-                    "\t":ops.io.OutputNumber
-                "\t":
-                    " ":ops.io.ReadChar
-                    "\t":ops.io.ReadNumber
-        "\n":#Flow Control
+            " ":ops.stack.Copy
+            "\n":ops.stack.Slide
+        "\n":
+            " ":ops.stack.Duplicate
+            "\t":ops.stack.Swap
+            "\n":ops.stack.Discard
+    "\t":
+        " ":#Arithmetic
             " ":
-                " ":ops.flow.Label
-                "\t":ops.flow.Call
-                "\n":ops.flow.Jump
+                " ":ops.arithmetic.Add
+                "\t":ops.arithmetic.Subtract
+                "\n":ops.arithmetic.Multiply
             "\t":
-                " ":ops.flow.JumpZero
-                "\t":ops.flow.JumpNegative
-                "\n":ops.flow.Return
-            "\n":
-                "\n":ops.flow.End
+                " ":ops.arithmetic.Divide
+                "\t":ops.arithmetic.Modulo
+        "\t":#Heap Access
+            " ":ops.heap.Store
+            "\t":ops.heap.Retrieve
+        "\n":#IO
+            " ":
+                " ":ops.io.OutputChar
+                "\t":ops.io.OutputNumber
+            "\t":
+                " ":ops.io.ReadChar
+                "\t":ops.io.ReadNumber
+    "\n":#Flow Control
+        " ":
+            " ":ops.flow.Label
+            "\t":ops.flow.Call
+            "\n":ops.flow.Jump
+        "\t":
+            " ":ops.flow.JumpZero
+            "\t":ops.flow.JumpNegative
+            "\n":ops.flow.Return
+        "\n":
+            "\n":ops.flow.End
+
+(->
+    chk=(obj,str)->
+        for key,value of obj
+            if "function"==typeof value
+                # コンストラクタに自身のコード情報をつけてあげる
+                value.code=str+key
+            else
+                chk value,str+key
+
+
+    chk opsTable,""
+)()
