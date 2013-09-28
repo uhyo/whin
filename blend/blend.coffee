@@ -21,7 +21,7 @@ fs.readFile process.argv[2],{encoding:"utf8"},(err,data)->
             blender=new manager.Blender 8,8,tokens,ops
             code=blender.blend()
 
-            console.log code#.replace(/\u0020/g,"[SP]".grey).replace(/\t/g,"[TB]".grey)
+            process.stdout.write code#.replace(/\u0020/g,"[SP]".grey).replace(/\t/g,"[TB]".grey)
 
 
 

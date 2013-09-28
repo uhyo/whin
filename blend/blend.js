@@ -33,7 +33,7 @@
         var blender, code;
         blender = new manager.Blender(8, 8, tokens, ops);
         code = blender.blend();
-        return console.log(code);
+        return process.stdout.write(code);
       });
     });
   });
