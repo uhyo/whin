@@ -15,8 +15,8 @@
 
     Program.prototype.load = function(io, callback) {
       var _this = this;
-      this.parser = new operations.Parser(this.env, io);
-      return this.parser.parse(function(ops) {
+      this.parser = new operations.Parser(io);
+      return this.parser.parse(this.env.debugMode, function(ops) {
         _this.ops = ops;
         return callback();
       });
@@ -113,7 +113,7 @@
       this.callstack = [];
       this.labels = {};
       this.program = new Program(this);
-      this.debugMode = false;
+      this.debugMode = null;
     }
 
     WSEnvironment.prototype.loadFile = function(filepath, callback) {

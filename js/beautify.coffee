@@ -8,7 +8,7 @@ fs.readFile process.argv[2],{encoding:"utf8"},(err,data)->
     p=new parser.JSParser
     sts=p.parse data
     manager=new parser.TokenizeManager
-    tokens=sts.tokenize manager
+    tokens=manager.tokenize sts
     console.log tokens.toString()
 
 

@@ -5,8 +5,8 @@ class Program
         @pointer=0
         @ops=[]
     load:(io,callback)->
-        @parser=new operations.Parser @env,io
-        @parser.parse (ops)=>
+        @parser=new operations.Parser io
+        @parser.parse @env.debugMode,(ops)=>
             @ops=ops
             callback()
     run:->

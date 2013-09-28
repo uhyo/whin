@@ -13,7 +13,7 @@ if i>=0
         process.argv.splice i,1
 
 if process.argv.length<3
-    console.error "No file specied."
+    console.error "No file specified."
     process.exit 0
 else
     env=new environment.WSEnvironment new io.Console

@@ -7,12 +7,15 @@ class Operation
         callback()
     ###
     #on: no callback; run:callback
+    @code:""
     log:(env)->
         if env.debugMode
             console.log @toString().blue
     isLabel:(label)->false
     toString:->
         @constructor.name
+    getCode:->
+        @constructor.code
 
 class NumberParamed extends Operation
     @param:"number"
@@ -20,6 +23,22 @@ class NumberParamed extends Operation
         #@number: number
     toString:->
         "#{super}(#{@number})"
+    getCode:->
+        # numを数値化
+        result=""
+        num=Math.abs @number
+        while num>0
+            if num%2==1
+                result="\t"+result
+                num--
+            else
+                result=" "+result
+            num/=2
+        if @number>=0
+            result=" "+result+"\n"
+        else
+            result="\t"+result+"\n"
+        @constructor.code+result
 
 class LabelParamed extends Operation
     @param:"label"
@@ -27,6 +46,8 @@ class LabelParamed extends Operation
         #@label: string
     toString:->
         "#{super}(#{@label})"
+    getCode:->
+        @constructor.code+@label+"\n"
 
 # 命令たち
 ops=exports=module.exports=
@@ -154,11 +175,11 @@ ops=exports=module.exports=
                     callback()
         
 exports.Parser=class Parser
-    constructor:(@env,@io)->
+    constructor:(@io)->
     readChar:(callback)->
         # Whitespace以外無視して読む
         io=@io
-        check=(char)=>
+        check=(char)->
             
             if !char? || char in [" ","\t","\n"]
                 callback char
@@ -166,12 +187,11 @@ exports.Parser=class Parser
                 io.readChar check
         io.readChar check
     # パースしてOperation配列を返す
-    parse:(callback)->
-        debug=@env.debugMode
+    parse:(debug,callback)->
         @io.readAll (data)=>
             # パースする
             chars=""
-            obj=@opsTable
+            obj=opsTable
             index=0
             len=data.length
             operations=[]
@@ -179,6 +199,13 @@ exports.Parser=class Parser
             readChar=->
                 while true
                     char=data[index]
+                    if debug
+                        process.stdout.write (switch char
+                            when " " then "[SP]"
+                            when "\t" then "[TB]"
+                            when "\n" then "[LF]"
+                            else String char
+                        ).grey
                     index++
                     unless char in [" ","\t","\n"]
                         continue
@@ -246,7 +273,7 @@ exports.Parser=class Parser
                         console.log op.toString().red
                     operations.push op
                     chars=""
-                    obj=@opsTable
+                    obj=opsTable
                 else unless obj?
                     chs=chars.replace(/\t/g,"[TB]").replace(/\n/g,"[LF]").replace(/\s/g,"[SP]")
                     throw new Error "Cannot parse '#{chs}'"
@@ -260,7 +287,7 @@ exports.Parser=class Parser
 
 
     nextOperation:(callback)->
-        obj=@opsTable
+        obj=opsTable
         chars=""
         check=(char)=>
             unless char?
@@ -336,7 +363,7 @@ opsTable=
                 value.code=str+key
             else
                 chk value,str+key
-
+        return
 
     chk opsTable,""
 )()

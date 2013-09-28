@@ -16,7 +16,7 @@
     p = new parser.JSParser;
     sts = p.parse(data);
     manager = new parser.TokenizeManager;
-    tokens = sts.tokenize(manager);
+    tokens = manager.tokenize(sts);
     return console.log(tokens.toString());
   });
 
