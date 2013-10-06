@@ -88,7 +88,7 @@
     }
 
     LabelParamed.prototype.toString = function() {
-      return "" + LabelParamed.__super__.toString.apply(this, arguments) + "(" + this.label + ")";
+      return "" + LabelParamed.__super__.toString.apply(this, arguments) + "(" + (this.label.replace(/\t/g, '[TB]').replace(/\s/g, '[SP]')) + ")";
     };
 
     LabelParamed.prototype.getCode = function() {

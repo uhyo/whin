@@ -45,7 +45,7 @@ class LabelParamed extends Operation
     constructor:(@label)->
         #@label: string
     toString:->
-        "#{super}(#{@label})"
+        "#{super}(#{@label.replace(/\t/g,'[TB]').replace(/\s/g,'[SP]')})"
     getCode:->
         @constructor.code+@label+"\n"
 

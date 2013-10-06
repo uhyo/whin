@@ -1751,3 +1751,4 @@ exports.DebuggerStatement=DebuggerStatement;
 exports.Expression=Expression;
 exports.ArrayLiteral=ArrayLiteral;
 exports.ObjectLiteral=ObjectLiteral;
+exports.Arguments=Arguments;
