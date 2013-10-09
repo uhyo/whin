@@ -315,7 +315,7 @@
     };
 
     Compiler.prototype.calc = function(exp, newvmode) {
-      var f, first, lit, res, second, v;
+      var f, first, key, lit, lstr, res, second, table, v, val;
       first = exp.parts[0];
       if (first instanceof parser.Expression) {
         if (exp.parts.length === 1) {
@@ -336,7 +336,7 @@
           return this.calc1before(exp.parts[1], first);
         }
         if (exp.parts.length === 3 && first.value === "(" && exp.parts[2].value === ")") {
-          return this.calc(obj.parts[1]);
+          return this.calc(exp.parts[1]);
         }
         throw new Error("解釈できません");
       } else if (exp.parts.length === 1) {
@@ -368,8 +368,36 @@
         } else if (first instanceof parser.RegExpLiteralToken) {
           throw new Error("正規表現リテラルは使用できません");
         } else if (first instanceof parser.StringLiteralToken) {
-          res = first.value.match(/^[\"\'](.+)[\"\']$/);
-          return new Literal(res[1]);
+          res = first.value.match(/^[\"\'](.*)[\"\']$/);
+          if (res == null) {
+            throw new Error("えっ文字列リテラルじゃないの " + first.value);
+          }
+          lstr = res[1];
+          table = {
+            "\\b": "\b",
+            "\\f": "\f",
+            "\\r": "\r",
+            "\\n": "\n",
+            "\\t": "\t",
+            "\\v": "\v",
+            "\\'": "'",
+            "\\\"": "\"",
+            "\\\\": "\\"
+          };
+          for (key in table) {
+            val = table[key];
+            lstr = lstr.replace(key, val);
+          }
+          lstr = lstr.replace("\\([0-7]{1,3})", function(all, num8) {
+            return String.fromCharCode(parseInt(num8, 8));
+          });
+          lstr = lstr.replace("\\x([0-9a-fA-F]{2})", function(all, num16) {
+            return String.fromCharCode(parseInt(num16, 16));
+          });
+          lstr = lstr.replace("\\u([0-9a-fA-F]{4})", function(all, num16) {
+            return String.fromCharCode(parseInt(num16, 16));
+          });
+          return new Literal(lstr);
         } else if (first instanceof parser.LiteralToken) {
           lit = (function() {
             var _ref, _ref1;
@@ -760,6 +788,8 @@
 
     Variable.prototype.TYPE_BOOLEAN = 3;
 
+    Variable.prototype.TYPE_UNKNOWN = 4;
+
     function Variable(name) {
       this.name = name;
       this.type = null;
@@ -824,6 +854,9 @@
         case "to_boolean":
         case "!":
           this.type = this.TYPE_BOOLEAN;
+          break;
+        case "to_string":
+          this.type = this.TYPE_STRING;
       }
     }
 

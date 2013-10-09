@@ -280,7 +280,7 @@ class Compiler
                 return @calc1before exp.parts[1],first
             if exp.parts.length==3 && first.value=="(" && exp.parts[2].value==")"
                 # 括弧だ!
-                return @calc obj.parts[1]
+                return @calc exp.parts[1]
             throw new Error "解釈できません"
         else if exp.parts.length==1
             if first instanceof parser.IdentifierToken
@@ -311,8 +311,27 @@ class Compiler
             else if first instanceof parser.RegExpLiteralToken
                 throw new Error "正規表現リテラルは使用できません"
             else if first instanceof parser.StringLiteralToken
-                res=first.value.match /^[\"\'](.+)[\"\']$/
-                return new Literal res[1]
+                res=first.value.match /^[\"\'](.*)[\"\']$/
+                unless res?
+                    throw new Error "えっ文字列リテラルじゃないの #{first.value}"
+                lstr=res[1]
+                # エスケープを変換
+                table=
+                    "\\b":"\b"
+                    "\\f":"\f"
+                    "\\r":"\r"
+                    "\\n":"\n"
+                    "\\t":"\t"
+                    "\\v":"\v"
+                    "\\'":"'"
+                    "\\\"":"\""
+                    "\\\\":"\\"
+                for key,val of table
+                    lstr=lstr.replace key,val
+                lstr=lstr.replace "\\([0-7]{1,3})",(all,num8)->String.fromCharCode parseInt num8,8
+                lstr=lstr.replace "\\x([0-9a-fA-F]{2})",(all,num16)->String.fromCharCode parseInt num16,16
+                lstr=lstr.replace "\\u([0-9a-fA-F]{4})",(all,num16)->String.fromCharCode parseInt num16,16
+                return new Literal lstr
             else if first instanceof parser.LiteralToken
                 lit=if first.value in ["true","false"]
                     new Literal (if first.value=="true" then true else false)
@@ -546,6 +565,7 @@ class Variable
     TYPE_NUMBER:1
     TYPE_STRING:2
     TYPE_BOOLEAN:3
+    TYPE_UNKNOWN:4    # よくわからない
     constructor:(@name)->   # name:string?
         @type=null
         # ws/compile によってsize（メモリサイズ）が付加されるかも
@@ -579,6 +599,8 @@ class Calc1 extends Calc
                 @type=@TYPE_NUMBER
             when "to_boolean","!"
                 @type=@TYPE_BOOLEAN
+            when "to_string"
+                @type=@TYPE_STRING
 class Calc2 extends Calc
     #punc:string, val1,val2: Variable or Literal
     constructor:(@punc,@val1,@val2)->

@@ -73,7 +73,7 @@ ops=exports=module.exports=
             on:(env)->
                 env.sassure 0
                 env.pop()
-        Slide:class Slide extends Operation
+        Slide:class Slide extends NumberParamed
             on:(env)->
                 stack=env.stack
                 idx=stack.length-1-@number

@@ -24,18 +24,11 @@
     };
 
     Compiler.prototype.maincalc = function(op) {
-      var constr, lb, neg, pos, tmplb;
+      var constr, lb, neg, tmplb;
       if (op instanceof idtm.Label) {
         return this.result.push(new wo.flow.Label(this.getLabel(op)));
       } else if (op instanceof idtm.SubstituteOperation) {
-        pos = this.allocHeap(op.v);
-        this.result.push(new wo.stack.Push(pos));
-        this.onstack(op.value);
-        if ((op.v.type != null) && op.v.type === op.v.TYPE_STRING) {
-          throw new Error("未実装:文字列のコピー");
-        } else {
-          return this.result.push(new wo.heap.Store);
-        }
+        return this.calc(op.value, op.v);
       } else if (op instanceof idtm.JumpOperation) {
         lb = this.getLabel(op.label);
         return this.result.push(new wo.flow.Jump(lb));
@@ -130,54 +123,190 @@
     };
 
     Compiler.prototype.onstack = function(obj) {
-      var a, args, code, endlb, heappos, i, lb, mae, octets, pos, tmpend, tmplb, tmpv, uuuuu, v, _i, _j, _len, _ref, _ref1, _results;
+      var tmpv;
+      if ((obj.type != null) && obj.type === obj.TYPE_STRING) {
+        if (obj instanceof idtm.Variable) {
+          this.result.push(new wo.stack.Push(this.allocHeap(obj)));
+          return;
+        } else {
+          tmpv = new idtm.Variable;
+          tmpv.type = tmpv.TYPE_STRING;
+          this.calc(obj, tmpv);
+          this.result.push(new wo.stack.Push(this.allocHeap(tmpv)));
+          return;
+        }
+      }
+      return this.calc(obj, null);
+    };
+
+    Compiler.prototype.calc = function(obj, v) {
+      var a, alloctets, args, ato, c, code, endlb, endlb2, i, idx, lb, lb2, lb3, newpos, octets, pos, str, tmpend, tmplb, tmpv, uuuuu, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
       if (obj instanceof idtm.Variable) {
         pos = this.allocHeap(obj);
-        this.result.push(new wo.stack.Push(pos));
-        return this.result.push(new wo.heap.Retrieve);
+        if (!((obj.type != null) && obj.type === obj.TYPE_STRING)) {
+          this.result.push(new wo.stack.Push(pos));
+          this.result.push(new wo.heap.Retrieve);
+        } else {
+          if (v == null) {
+            this.onstack(obj);
+            return;
+          }
+          newpos = this.allocHeap(v);
+          this.result.push(new wo.stack.Push(0));
+          lb = this.getLabel();
+          endlb = this.getLabel();
+          this.result.push(new wo.flow.Label(lb));
+          this.result.push(new wo.stack.Duplicate);
+          this.result.push(new wo.stack.Push(pos));
+          this.result.push(new wo.arithmetic.Add);
+          this.result.push(new wo.heap.Retrieve);
+          this.result.push(new wo.stack.Duplicate);
+          this.result.push(new wo.stack.Copy(2));
+          this.result.push(new wo.stack.Push(newpos));
+          this.result.push(new wo.arithmetic.Add);
+          this.result.push(new wo.stack.Swap);
+          this.result.push(new wo.heap.Store);
+          this.result.push(new wo.flow.JumpZero(endlb));
+          this.result.push(new wo.stack.Push(1));
+          this.result.push(new wo.arithmetic.Add);
+          this.result.push(new wo.flow.Jump(lb));
+          this.result.push(new wo.flow.Label(endlb));
+          this.result.push(new wo.stack.Discard);
+          return;
+        }
       } else if (obj instanceof idtm.Literal) {
         if (obj.type === obj.TYPE_STRING) {
-          this.result.push(new wo.stack.Push(0));
-          _results = [];
-          for (i = _i = 0, _ref = obj.value.length; _i > _ref; i = _i += -1) {
-            code = obj.value.charCodeAt(i);
-            octets = code < 0x80 ? [code] : code < 0x800 ? [0xC0 | ((code >>> 6) & 0x1F), 0x80 | (code & 0x3F)] : code < 0xD7FF || (0xE000 <= code && code < 0x10000) ? [0xE0 | ((code >>> 12) & 0x0F), 0x80 | ((code >>> 6) & 0x3F), 0x80 | (code & 0x3F)] : 0xDC00 <= code ? (mae = obj.value.charCodeAt(i - 1), uuuuu = ((mae >>> 6) & 0x0F) + 1, [0xF0 | (uuuuu >> 2), 0x80 | ((uuuuu & 3) << 4) | ((mae >> 2) & 0x0F), 0x80 | ((mae & 3) << 4) | ((code >> 6) & 0x0F), 0x80 | (code & 0x3F)]) : [];
-            octets.reverse();
-            _results.push((function() {
-              var _j, _len, _results1;
-              _results1 = [];
-              for (_j = 0, _len = octets.length; _j < _len; _j++) {
-                code = octets[_j];
-                _results1.push(this.result.push(new wo.stack.Push(code)));
-              }
-              return _results1;
-            }).call(this));
+          if (v == null) {
+            this.onstack(obj);
+            return;
           }
-          return _results;
+          alloctets = [];
+          i = 0;
+          idx = 0;
+          str = obj.value;
+          for (i = _i = 0, _ref = str.length; 0 <= _ref ? _i < _ref : _i > _ref; i = 0 <= _ref ? ++_i : --_i) {
+            code = str.charCodeAt(i);
+            octets = code < 0x80 ? [code] : code < 0x800 ? [0xC0 | ((code >>> 6) & 0x1F), 0x80 | (code & 0x3F)] : code < 0xD7FF || (0xE000 <= code && code < 0x10000) ? [0xE0 | ((code >>> 12) & 0x0F), 0x80 | ((code >>> 6) & 0x3F), 0x80 | (code & 0x3F)] : code <= 0xD800 ? (ato = obj.value.charCodeAt(i + 1), uuuuu = ((code >>> 6) & 0x0F) + 1, [0xF0 | (uuuuu >> 2), 0x80 | ((uuuuu & 3) << 4) | ((code >> 2) & 0x0F), 0x80 | ((code & 3) << 4) | ((ato >> 6) & 0x0F), 0x80 | (ato & 0x3F)]) : [];
+            for (_j = 0, _len = octets.length; _j < _len; _j++) {
+              c = octets[_j];
+              alloctets.push(c);
+              idx++;
+            }
+          }
+          alloctets.push(0);
+          pos = this.allocHeap(v);
+          for (idx = _k = 0, _len1 = alloctets.length; _k < _len1; idx = ++_k) {
+            c = alloctets[idx];
+            this.result.push(new wo.stack.Push(pos + idx));
+            this.result.push(new wo.stack.Push(c));
+            this.result.push(new wo.heap.Store);
+          }
+          return;
         } else {
-          return this.result.push(new wo.stack.Push(+obj.value));
+          this.result.push(new wo.stack.Push(+obj.value));
         }
       } else if (obj instanceof idtm.Calc) {
         if (obj instanceof idtm.Calc1) {
           switch (obj.op) {
             case "to_number":
-              return this.onstack(obj.value);
+              if (obj.value.type && obj.value.type === obj.value.TYPE_STRING) {
+                throw new Error("文字列を数値に変換できません");
+              }
+              this.calc(obj.value, v);
+              break;
             case "to_boolean":
             case "!":
-              this.onstack(obj.value);
-              if (obj.value.type !== obj.value.TYPE_BOOLEAN) {
+              if (obj.value.type && obj.value.type === obj.value.TYPE_STRING) {
+                this.result.push(new wo.stack.Push(0));
+                this.onstack(obj.value);
+                this.result.push(new wo.heap.Retrieve);
                 tmplb = this.getLabel();
-                this.result.push(new wo.stack.Duplicate);
                 this.result.push(new wo.flow.JumpZero(tmplb));
                 this.result.push(new wo.stack.Discard);
                 this.result.push(new wo.stack.Push(1));
                 this.result.push(new wo.flow.Label(tmplb));
+              } else {
+                if (obj.value.type !== obj.value.TYPE_BOOLEAN) {
+                  tmplb = this.getLabel();
+                  this.result.push(new wo.stack.Push(0));
+                  this.onstack(obj.value);
+                  this.result.push(new wo.flow.JumpZero(tmplb));
+                  this.result.push(new wo.stack.Discard);
+                  this.result.push(new wo.stack.Push(1));
+                  this.result.push(new wo.flow.Label(tmplb));
+                } else {
+                  this.onstack(obj.value);
+                }
               }
               if (obj.op === "!") {
                 this.result.push(new wo.stack.Push(1));
                 this.result.push(new wo.stack.Swap);
-                return this.result.push(new wo.arithmetic.Subtract);
+                this.result.push(new wo.arithmetic.Subtract);
               }
+              break;
+            case "to_string":
+              if ((obj.value.type != null) && obj.value.type === obj.value.TYPE_STRING) {
+                this.calc(obj.value, v);
+                return;
+              }
+              if (v == null) {
+                this.onstack(obj);
+                return;
+              }
+              pos = this.allocHeap(v);
+              this.result.push(new wo.stack.Push(0));
+              this.onstack(obj.value);
+              if ((obj.value.type != null) && obj.value.type === obj.value.TYPE_BOOLEAN) {
+                lb = this.getLabel();
+                endlb = this.getLabel();
+                this.result.push(new wo.flow.JumpZero(lb));
+                this.result.push(new wo.stack.Push(0x65));
+                this.result.push(new wo.stack.Push(0x75));
+                this.result.push(new wo.stack.Push(0x72));
+                this.result.push(new wo.stack.Push(0x74));
+                this.result.push(new wo.flow.Jump(endlb));
+                this.result.push(new wo.flow.Label(lb));
+                this.result.push(new wo.stack.Push(0x65));
+                this.result.push(new wo.stack.Push(0x73));
+                this.result.push(new wo.stack.Push(0x6C));
+                this.result.push(new wo.stack.Push(0x61));
+                this.result.push(new wo.stack.Push(0x66));
+                this.result.push(new wo.flow.Label(endlb));
+              } else {
+                lb = this.getLabel();
+                endlb = this.getLabel();
+                this.result.push(new wo.flow.Label(lb));
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Push(10));
+                this.result.push(new wo.arithmetic.Modulo);
+                this.result.push(new wo.stack.Push(0x30));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.stack.Swap);
+                this.result.push(new wo.stack.Push(10));
+                this.result.push(new wo.arithmetic.Divide);
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.flow.JumpZero(endlb));
+                this.result.push(new wo.flow.Jump(lb));
+                this.result.push(new wo.flow.Label(endlb));
+                this.result.push(new wo.stack.Discard);
+              }
+              this.result.push(new wo.stack.Push(0));
+              lb2 = this.getLabel();
+              endlb2 = this.getLabel();
+              this.result.push(new wo.flow.Label(lb2));
+              this.result.push(new wo.stack.Duplicate);
+              this.result.push(new wo.stack.Push(pos));
+              this.result.push(new wo.arithmetic.Add);
+              this.result.push(new wo.stack.Copy(2));
+              this.result.push(new wo.heap.Store);
+              this.result.push(new wo.stack.Swap);
+              this.result.push(new wo.flow.JumpZero(endlb2));
+              this.result.push(new wo.stack.Push(1));
+              this.result.push(new wo.arithmetic.Add);
+              this.result.push(new wo.flow.Jump(lb2));
+              this.result.push(new wo.flow.Label(endlb2));
+              this.result.push(new wo.stack.Discard);
+              return;
           }
         } else if (obj instanceof idtm.Calc2) {
           switch (obj.punc) {
@@ -186,32 +315,145 @@
             case "*":
             case "/":
             case "%":
-              this.onstack(obj.val1);
-              this.onstack(obj.val2);
-              return this.result.push((function() {
-                switch (obj.punc) {
-                  case "+":
-                    return new wo.arithmetic.Add;
-                  case "-":
-                    return new wo.arithmetic.Subtract;
-                  case "*":
-                    return new wo.arithmetic.Multiply;
-                  case "/":
-                    return new wo.arithmetic.Divide;
-                  case "%":
-                    return new wo.arithmetic.Modulo;
+              if ((obj.type != null) && obj.type === obj.TYPE_STRING) {
+                if (obj.punc !== "+") {
+                  throw new Error("文字列の計算は加算以外できません");
                 }
-              })());
+                if (v == null) {
+                  this.onstack(obj);
+                  return;
+                }
+                newpos = this.allocHeap(v);
+                if ((obj.val1.type != null) && obj.val1.type === obj.val1.TYPE_STRING) {
+                  this.onstack(obj.val1);
+                } else {
+                  this.onstack(new idtm.Calc1("to_string", obj.val1));
+                }
+                this.result.push(new wo.stack.Push(0));
+                lb = this.getLabel();
+                endlb = this.getLabel();
+                this.result.push(new wo.flow.Label(lb));
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(2));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.heap.Retrieve);
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(2));
+                this.result.push(new wo.stack.Push(newpos));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.stack.Swap);
+                this.result.push(new wo.heap.Store);
+                this.result.push(new wo.flow.JumpZero(endlb));
+                this.result.push(new wo.stack.Push(1));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.flow.Jump(lb));
+                this.result.push(new wo.flow.Label(endlb));
+                this.result.push(new wo.stack.Slide(1));
+                if ((obj.val2.type != null) && obj.val2.type === obj.val2.TYPE_STRING) {
+                  this.onstack(obj.val2);
+                } else {
+                  this.onstack(new idtm.Calc1("to_string", obj.val2));
+                }
+                this.result.push(new wo.stack.Swap);
+                lb2 = this.getLabel();
+                endlb2 = this.getLabel();
+                this.result.push(new wo.stack.Push(0));
+                this.result.push(new wo.flow.Label(lb2));
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(3));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.heap.Retrieve);
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(2));
+                this.result.push(new wo.stack.Push(newpos));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.stack.Copy(4));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.stack.Swap);
+                this.result.push(new wo.heap.Store);
+                this.result.push(new wo.flow.JumpZero(endlb2));
+                this.result.push(new wo.stack.Push(1));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.flow.Jump(lb2));
+                this.result.push(new wo.flow.Label(endlb2));
+                this.result.push(new wo.stack.Slide(2));
+                this.result.push(new wo.stack.Discard);
+                return;
+              } else {
+                this.onstack(obj.val1);
+                this.onstack(obj.val2);
+                this.result.push((function() {
+                  switch (obj.punc) {
+                    case "+":
+                      return new wo.arithmetic.Add;
+                    case "-":
+                      return new wo.arithmetic.Subtract;
+                    case "*":
+                      return new wo.arithmetic.Multiply;
+                    case "/":
+                      return new wo.arithmetic.Divide;
+                    case "%":
+                      return new wo.arithmetic.Modulo;
+                  }
+                })());
+              }
+              break;
             case "!=":
             case "!==":
-              return this.onstack(new idtm.Calc1("to_boolean", new idtm.Calc2("-", obj.val1, obj.val2)));
+              if ((obj.val1.type != null) && obj.val1.type === obj.val1.TYPE_STRING || (obj.val2.type != null) && obj.val2.type === obj.val2.TYPE_STRING) {
+                this.call(new idtm.Calc1("!", new idtm.Calc2("==", obj.val1, obj.val2)), v);
+                return;
+              }
+              this.onstack(new idtm.Calc1("to_boolean", new idtm.Calc2("-", obj.val1, obj.val2)));
+              break;
             case "==":
             case "===":
-              return this.onstack(new idtm.Calc1("!", new idtm.Calc2("-", obj.val1, obj.val2)));
+              if ((obj.val1.type != null) && obj.val1.type === obj.val1.TYPE_STRING && (obj.val2.type != null) && obj.val2.type === obj.val2.TYPE_STRING) {
+                lb = this.getLabel();
+                lb2 = this.getLabel();
+                lb3 = this.getLabel();
+                endlb = this.getLabel();
+                this.result.push(new wo.stack.Push(1));
+                this.onstack(obj.val1);
+                this.onstack(obj.val2);
+                this.result.push(new wo.stack.Push(0));
+                this.result.push(new wo.flow.Label(lb));
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(3));
+                this.result.push(new wo.stack.Add);
+                this.result.push(new wo.heap.Retrieve);
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(2));
+                this.result.push(new wo.stack.Copy(4));
+                this.result.push(new wo.stack.Add);
+                this.result.push(new wo.heap.Retrieve);
+                this.result.push(new wo.arithmetic.Subtract);
+                this.result.push(new wo.flow.JumpZero(lb2));
+                this.result.push(new wo.stack.Slide(4));
+                this.result.push(new wo.stack.Discard);
+                this.result.push(new wo.stack.Push(0));
+                this.result.push(new wo.flow.Jump(endlb));
+                this.result.push(new wo.flow.Label(lb2));
+                this.result.push(new wo.stack.JumpZero(lb3));
+                this.result.push(new wo.stack.Push(1));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.flow.Jump(lb));
+                this.result.push(new wo.flow.Label(lb3));
+                this.result.push(new wo.flow.Slide(2));
+                this.result.push(new wo.stack.Discard);
+              } else if ((obj.val1.type != null) && obj.val1.type === obj.val1.TYPE_STRING || (obj.val2.type != null) && obj.val2.type === obj.val2.TYPE_STRING) {
+                throw new Error("文字列とそれ以外の等値比較はできません。");
+              } else {
+                this.onstack(new idtm.Calc1("!", new idtm.Calc2("-", obj.val1, obj.val2)));
+              }
+              break;
             case ">":
             case ">=":
             case "<":
             case "<=":
+              if ((obj.val1.type != null) && obj.val1.type === obj.val1.TYPE_STRING || (obj.val2.type != null) && obj.val2.type === obj.val2.TYPE_STRING) {
+                throw new Error("文字列の比較はできません。");
+              }
               tmplb = this.getLabel();
               tmpend = this.getLabel();
               switch (obj.punc) {
@@ -241,7 +483,8 @@
               this.result.push(new wo.flow.Jump(tmpend));
               this.result.push(new wo.flow.Label(tmplb));
               this.result.push(new wo.stack.Push(1));
-              return this.result.push(new wo.flow.Label(tmpend));
+              this.result.push(new wo.flow.Label(tmpend));
+              break;
             case "||":
               this.onstack(new idtm.Calc1("to_boolean", obj.val1));
               this.onstack(new idtm.Calc1("to_boolean", obj.val2));
@@ -253,11 +496,12 @@
               tmplb = this.getLabel();
               this.result.push(new wo.flow.JumpZero(tmplb));
               this.result.push(new wo.stack.Discard);
-              return this.resutl.push(new wo.stack.Push(0));
+              this.resutl.push(new wo.stack.Push(0));
+              break;
             case "&&":
               this.onstack(new idtm.Calc1("to_boolean", obj.val1));
               this.onstack(new idtm.Calc1("to_boolean", obj.val2));
-              return this.result.push(new wo.arithmetic.Multiply);
+              this.result.push(new wo.arithmetic.Multiply);
           }
         } else if (obj instanceof idtm.Call) {
           if (obj.func instanceof idtm.NativeFunc) {
@@ -266,27 +510,45 @@
               if (a == null) {
                 throw new Error("printの引数がありません。");
               }
-              if (a instanceof idtm.Calc2) {
-                if ((a.type != null) && a.type === a.TYPE_STRING && a.punc === "+") {
-                  this.onstack(new idtm.Call(new idtm.Print, [a.val1]));
-                  this.onstack(new idtm.Call(new idtm.Print, [a.val2]));
-                  this.result.push(new wo.stack.Discard);
-                  return;
+              /*
+              if a instanceof idtm.Calc2
+                  if a.type? && a.type==a.TYPE_STRING && a.punc=="+"
+                      # 文字列連結だ
+                      # 分解する
+                      @onstack new idtm.Call new idtm.Print,[a.val1]
+                      @onstack new idtm.Call new idtm.Print,[a.val2]
+                      @result.push new wo.stack.Discard
+                      return
+              */
+
+              if ((a.type != null) && ((_ref1 = a.type) === a.TYPE_STRING || _ref1 === a.TYPE_BOOLEAN)) {
+                if (a.type === a.TYPE_BOOLEAN) {
+                  this.onstack(new idtm.Calc1("to_string", a));
+                } else {
+                  this.onstack(a);
                 }
-              }
-              this.onstack(a);
-              if ((a.type != null) && a.type === a.TYPE_STRING) {
                 tmplb = this.getLabel();
                 endlb = this.getLabel();
+                this.result.push(new wo.stack.Push(0));
                 this.result.push(new wo.flow.Label(tmplb));
+                this.result.push(new wo.stack.Duplicate);
+                this.result.push(new wo.stack.Copy(2));
+                this.result.push(new wo.arithmetic.Add);
+                this.result.push(new wo.heap.Retrieve);
                 this.result.push(new wo.stack.Duplicate);
                 this.result.push(new wo.flow.JumpZero(endlb));
                 this.result.push(new wo.io.OutputChar);
+                this.result.push(new wo.stack.Push(1));
+                this.result.push(new wo.arithmetic.Add);
                 this.result.push(new wo.flow.Jump(tmplb));
-                return this.result.push(new wo.flow.Label(endlb));
+                this.result.push(new wo.flow.Label(endlb));
+                this.result.push(new wo.stack.Slide(2));
+              } else if (a instanceof idtm.Variable && a.type === a.TYPE_UNKNOWN) {
+                throw new Error("変数" + ((_ref2 = a.name) != null ? _ref2 : '') + "の型を特定できないのでprintできません。");
               } else {
+                this.onstack(a);
                 this.result.push(new wo.io.OutputNumber);
-                return this.result.push(new wo.stack.Push(0));
+                this.result.push(new wo.stack.Push(0));
               }
             } else if (obj.func instanceof idtm.Charcode) {
               a = obj.args[0];
@@ -295,19 +557,7 @@
               }
               this.onstack(a);
               if ((a.type != null) && a.type === a.TYPE_STRING) {
-                tmpv = new idtm.Variable;
-                pos = this.allocHeap(tmpv);
-                this.result.push(new wo.stack.Push(pos));
-                this.result.push(new wo.stack.Swap);
-                this.result.push(new wo.heap.Store);
-                tmplb = this.getLabel();
-                endlb = this.getLabel();
-                this.result.push(new wo.flow.Label(tmplb));
-                this.result.push(new wo.flow.JumpZero(endlb));
-                this.result.push(new wo.flow.Jump(tmplb));
-                this.result.push(new wo.flow.Label(endlb));
-                this.result.push(new wo.stack.Push(pos));
-                return this.result.push(new wo.heap.Retrieve);
+                this.result.push(new wo.heap.Retrieve);
               }
             } else if (obj.func instanceof idtm.InputChar) {
               tmpv = new idtm.Variable;
@@ -315,34 +565,46 @@
               this.result.push(new wo.stack.Push(pos));
               this.result.push(new wo.io.ReadChar);
               this.result.push(new wo.stack.Push(pos));
-              return this.result.push(new wo.heap.Retrieve);
+              this.result.push(new wo.heap.Retrieve);
             } else if (obj.func instanceof idtm.InputNumber) {
               tmpv = new idtm.Variable;
               pos = this.allocHeap(tmpv);
               this.result.push(new wo.stack.Push(pos));
               this.result.push(new wo.io.ReadNumber);
               this.result.push(new wo.stack.Push(pos));
-              return this.result.push(new wo.heap.Retrieve);
+              this.result.push(new wo.heap.Retrieve);
             } else {
               throw new Error("ん？");
             }
           } else {
             lb = this.getLabel(obj.func);
             args = obj.args;
-            _ref1 = obj.func.start.vars;
-            for (i = _j = 0, _len = _ref1.length; _j < _len; i = ++_j) {
-              v = _ref1[i];
+            _ref3 = obj.func.start.vars;
+            for (i = _l = 0, _len2 = _ref3.length; _l < _len2; i = ++_l) {
+              v = _ref3[i];
               if (args[i] == null) {
                 throw new Error("引数が足りません");
               }
-              heappos = this.allocHeap(v);
-              this.result.push(new wo.stack.Push(heappos));
-              this.onstack(args[i]);
-              this.result.push(new wo.heap.Store);
+              this.calc(args[i], v);
+              if (args[i].type != null) {
+                if (v.type != null) {
+                  if (args[i].type !== v.type) {
+                    v.type = v.TYPE_UNKNOWN;
+                  }
+                } else {
+                  v.type = args[i].type;
+                }
+              }
             }
-            return this.result.push(new wo.flow.Call(lb));
+            this.result.push(new wo.flow.Call(lb));
           }
         }
+      }
+      if (v != null) {
+        pos = this.allocHeap(v);
+        this.result.push(new wo.stack.Push(pos));
+        this.result.push(new wo.stack.Swap);
+        return this.result.push(new wo.heap.Store);
       }
     };
 
@@ -389,7 +651,8 @@
         }
         i += va.size;
       }
-      while (i < len) {
+      i = 0;
+      while (true) {
         va = this.heap[i];
         if (va == null) {
           heappos = i;

@@ -200,7 +200,7 @@
 
         return Slide;
 
-      })(Operation)
+      })(NumberParamed)
     },
     arithmetic: {
       Add: Add = (function(_super) {
