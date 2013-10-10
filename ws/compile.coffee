@@ -103,6 +103,14 @@ class Compiler
         else if op instanceof idtm.ReturnOperation
             if op.returnvalue?
                 @onstack op.returnvalue
+                # 関数の型をアレする
+                if op.returnvalue.type?
+                    unless op.func.type?
+                        # いろいろいろ
+                        op.func.type=op.returnvalue.type
+                    else if op.returnvalue.type!=op.func.type
+                        # あれっ
+                        op.func.type=op.func.TYPE_UNKNOWN
             else
                 # ダミー
                 @result.push new wo.stack.Push 0
@@ -586,16 +594,6 @@ class Compiler
                         a=obj.args[0]
                         unless a?
                             throw new Error "printの引数がありません。"
-                        ###
-                        if a instanceof idtm.Calc2
-                            if a.type? && a.type==a.TYPE_STRING && a.punc=="+"
-                                # 文字列連結だ
-                                # 分解する
-                                @onstack new idtm.Call new idtm.Print,[a.val1]
-                                @onstack new idtm.Call new idtm.Print,[a.val2]
-                                @result.push new wo.stack.Discard
-                                return
-                        ###
                         # その他はそのままアレする
                         if a.type? && (a.type in [a.TYPE_STRING,a.TYPE_BOOLEAN])
                             # 掘り進める
@@ -638,47 +636,121 @@ class Compiler
                         a=obj.args[0]
                         unless a?
                             throw new Error "charcodeの引数がありません。"
+                        b=obj.args[1]
+                        unless b?
+                            b=new idtm.Literal 0
                         @onstack a
                         if a.type? && a.type==a.TYPE_STRING
                             # 文字列だ
+                            @onstack b
+                            @result.push new wo.arithmetic.Add
                             @result.push new wo.heap.Retrieve
                     else if obj.func instanceof idtm.InputChar
                         # 文字ひとつ入力
-                        tmpv=new idtm.Variable
-                        pos=@allocHeap tmpv
-                        @result.push new wo.stack.Push pos
-                        @result.push new wo.io.ReadChar
-                        @result.push new wo.stack.Push pos
-                        @result.push new wo.heap.Retrieve
+                        if v?
+                            # これに入れよう
+                            @result.push new wo.stack.Push @allocHeap v
+                            @result.push new wo.io.ReadChar
+                            return
+                        else
+                            # 入力用ヒープ
+                            tmpv=new idtm.Variable
+                            pos=@allocHeap tmpv
+                            @result.push new wo.stack.Push pos
+                            @result.push new wo.io.ReadChar
+                            @result.push new wo.stack.Push pos
+                            @result.push new wo.heap.Retrieve
                     else if obj.func instanceof idtm.InputNumber
-                        tmpv=new idtm.Variable
-                        pos=@allocHeap tmpv
+                        if v?
+                            # これに入れよう
+                            @result.push new wo.stack.Push @allocHeap v
+                            @result.push new wo.io.ReadChar
+                            return
+                        else
+                            tmpv=new idtm.Variable
+                            pos=@allocHeap tmpv
+                            @result.push new wo.stack.Push pos
+                            @result.push new wo.io.ReadNumber
+                            @result.push new wo.stack.Push pos
+                            @result.push new wo.heap.Retrieve
+                    else if obj.func instanceof idtm.CodeToString
+                        # 文字コードをアレする
+                        unless v?
+                            #えっ
+                            @onstack obj
+                            return
+                        a=obj.args[0]
+                        unless a?
+                            throw new Error "charcodeの引数がありません。"
+                        if a.type? && a.type!=a.TYPE_NUMBER
+                            throw new Error "codeToStringは数値を引数に呼び出す必要があります。"
+                        pos=@allocHeap v
                         @result.push new wo.stack.Push pos
-                        @result.push new wo.io.ReadNumber
-                        @result.push new wo.stack.Push pos
-                        @result.push new wo.heap.Retrieve
+                        @onstack a
+                        @result.push new wo.heap.Store
+                        @result.push new wo.stack.Push pos+1
+                        @result.push new wo.stack.Push 0
+                        @result.push new wo.heap.Store
+                        return
                     else
                         throw new Error "ん？"
 
                 else
                     lb=@getLabel obj.func
                     args=obj.args
-                    for v,i in obj.func.start.vars
+                    for va,i in obj.func.start.vars
                         unless args[i]?
                             #えっ
                             throw new Error "引数が足りません"
-                        @calc args[i],v
+                        @calc args[i],va
                         # 変数の型
                         if args[i].type?
-                            if v.type?
-                                if args[i].type!=v.type
+                            if va.type?
+                                if args[i].type!=va.type
                                     # あーあ
-                                    v.type=v.TYPE_UNKNOWN
+                                    va.type=v.TYPE_UNKNOWN
                             else
-                                v.type=args[i].type
+                                va.type=args[i].type
 
                     @result.push new wo.flow.Call lb
-                    
+                    if v? && obj.func.type? && obj.func.type==obj.func.TYPE_STRING
+                        # 位置をたよりにコピー
+                        newpos=@allocHeap v
+                        # 位置
+                        @result.push new wo.stack.Push 0
+                        lb2=@getLabel()
+                        endlb2=@getLabel()
+                        @result.push new wo.flow.Label lb2
+                        # スタック状況: * [oldPos] [i]
+                        # 位置をコピー
+                        @result.push new wo.stack.Duplicate
+                        @result.push new wo.stack.Copy 2
+                        @result.push new wo.arithmetic.Add
+                        # スタック状況: * [oldPos] [i] [oldPos+i]
+                        # つぎのヒープ位置
+                        @result.push new wo.heap.Retrieve
+                        @result.push new wo.stack.Duplicate
+                        # スタック状況: * [oldPos] [i] [i番目の文字] [i番目の文字]
+                        # 位置をコピー
+                        @result.push new wo.stack.Copy 2
+                        @result.push new wo.stack.Push newpos
+                        @result.push new wo.arithmetic.Add
+                        # スタック状況: * [oldPos] [i] [i番目の文字] [i番目の文字] [newPos+i]
+                        @result.push new wo.stack.Swap
+                        @result.push new wo.heap.Store
+                        # スタック状況: * [oldPos] [i] [i番目の文字]
+                        @result.push new wo.flow.JumpZero endlb2
+                        # 次の位置へ
+                        @result.push new wo.stack.Push 1
+                        @result.push new wo.arithmetic.Add
+                        # スタック状況: * [oldPos] [i+1]
+                        @result.push new wo.flow.Jump lb2
+                        # 後始末
+                        @result.push new wo.flow.Label endlb2
+                        # スタック状況: * [oldPos] [i]
+                        @result.push new wo.stack.Discard
+                        @result.push new wo.stack.Discard
+                        return
         # スタックに載っているのでvがあれば最後にいれる
         if v?
             pos=@allocHeap v

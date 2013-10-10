@@ -58,6 +58,8 @@ class Compiler
         # ループスタック
         @reservedLabelNames=[] #LabelledStatement用
         @iterationStack=[]  # [IterationManager]
+        # 関数定義スタック
+        @funcStack=[]   # [Func]
         # 得な伊豆用
         @tma=new parser.TokenizeManager
     compile:(statements)->
@@ -205,8 +207,11 @@ class Compiler
         else if obj instanceof parser.BreakStatement
             @dobreak obj.identifier?.value
         else if obj instanceof parser.ReturnStatement
+            f=@funcStack[@funcStack.length-1]
+            unless f?
+                throw new Error "関数外でreturnは使用できません"
             if obj.exp?
-                @result.push new ReturnOperation @calc obj.exp
+                @result.push new ReturnOperation f,@calc obj.exp
             else
                 @result.push new ReturnOperation
         else if obj instanceof parser.WithStatement
@@ -300,12 +305,14 @@ class Compiler
                     switch first.value
                         when "print"
                             return new Print
-                        when "charcode"
+                        when "charCode"
                             return new Charcode
-                        when "inputchar"
+                        when "inputChar"
                             return new InputChar
-                        when "inputnumber"
+                        when "inputNumber"
                             return new InputNumber
+                        when "codeToString"
+                            return new CodeToString
                     throw new Error "Undefined variable #{first.value}"
                 return v
             else if first instanceof parser.RegExpLiteralToken
@@ -423,7 +430,16 @@ class Compiler
     # 関数を作る（コード展開はしない）
     makeFunction:(func)->
         #func: FunctionDeclaration
-        new Func func.name,func.paramlist,func.functionbody
+        res=new Func func.name,func.paramlist,func.functionbody
+        # 独自拡張
+        switch func.returnType
+            when "number"
+                res.type=res.TYPE_NUMBER
+            when "string"
+                res.type=res.TYPE_STRING
+            when "boolean"
+                res.type=res.TYPE_BOOLEAN
+        res
     codeFunction:(func)->
         #func: Func
         # 新しいクロージャを展開
@@ -434,12 +450,14 @@ class Compiler
             #pi: parser.Identifier
             v=@getLocalVariable pi.value
             func.start.vars.push v
+        @funcStack.push func
         # 開始点をアレする
         @result.push func.start
         # 中身を展開する
         @statements func.functionbody,false
         # いちおうreturnをおいておく
-        @result.push new ReturnOperation
+        @result.push new ReturnOperation func
+        @funcStack.pop()
         # クロージャを破棄する
         @closure=@closure.parent
     # 数値に変換する
@@ -556,7 +574,7 @@ class JumpunlessOperation extends Operation
     constructor:(@cond,@label)->
 # return文
 class ReturnOperation extends Operation
-    constructor:(@returnvalue)->
+    constructor:(@func,@returnvalue)->
 # 終了文
 class End extends Operation
 # 変数
@@ -588,6 +606,7 @@ class Calc
     TYPE_NUMBER:1
     TYPE_STRING:2
     TYPE_BOOLEAN:3
+    TYPE_UNKNOWN:4
     constructor:->
         @type=null
 
@@ -618,8 +637,13 @@ class Calc2 extends Calc
                @type=@TYPE_BOOLEAN
 # 関数
 class Func
+    TYPE_NUMBER:1
+    TYPE_STRING:2
+    TYPE_BOOLEAN:3
+    TYPE_UNKNOWN:4
     constructor:(@name,@paramlist,@functionbody)->
         # 開始場所を作っておく
+        @type=null
         @start=new FunctionStart @
         #ws/compileによってlabelが付加されるかも
 class FunctionStart extends Operation
@@ -627,24 +651,36 @@ class FunctionStart extends Operation
         @vars=[]    #Variable
 # 関数呼び出し
 class Call extends Calc
+    TYPE_NUMBER:1
+    TYPE_STRING:2
+    TYPE_BOOLEAN:3
+    TYPE_UNKNOWN:4    # よくわからない
     constructor:(@func,@args)->   #func:Func; args: calcの返り値的な
-        if @func instanceof Charcode || @func instanceof InputChar || @func instanceof InputNumber
-            @type=@TYPE_NUMBER
+        if @func.type?
+            @type=@func.type
 
 # 組み込み関数
 class NativeFunc extends Func
 class Print extends NativeFunc
     constructor:->
         super "print",[],null
+        @type=@TYPE_NUMBER
 class Charcode extends NativeFunc
     constructor:->
-        super "charcode",[],null
+        super "charCode",[],null
+        @type=@TYPE_NUMBER
 class InputChar extends NativeFunc
     constructor:->
-        super "inputchar",[],null
+        super "inputChar",[],null
+        @type=@TYPE_NUMBER
 class InputNumber extends NativeFunc
     constructor:->
-        super "inputnumber",[],null
+        super "inputNumber",[],null
+        @type=@TYPE_NUMBER
+class CodeToString extends NativeFunc
+    constructor:->
+        super "codeToString",[],null
+        @type=@TYPE_STRING
 
 
 # エクスポート
@@ -671,3 +707,4 @@ exports.Print=Print
 exports.Charcode=Charcode
 exports.InputChar=InputChar
 exports.InputNumber=InputNumber
+exports.CodeToString=CodeToString

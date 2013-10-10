@@ -110,6 +110,13 @@
       } else if (op instanceof idtm.ReturnOperation) {
         if (op.returnvalue != null) {
           this.onstack(op.returnvalue);
+          if (op.returnvalue.type != null) {
+            if (op.func.type == null) {
+              op.func.type = op.returnvalue.type;
+            } else if (op.returnvalue.type !== op.func.type) {
+              op.func.type = op.func.TYPE_UNKNOWN;
+            }
+          }
         } else {
           this.result.push(new wo.stack.Push(0));
         }
@@ -140,7 +147,7 @@
     };
 
     Compiler.prototype.calc = function(obj, v) {
-      var a, alloctets, args, ato, c, code, endlb, endlb2, i, idx, lb, lb2, lb3, newpos, octets, pos, str, tmpend, tmplb, tmpv, uuuuu, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
+      var a, alloctets, args, ato, b, c, code, endlb, endlb2, i, idx, lb, lb2, lb3, newpos, octets, pos, str, tmpend, tmplb, tmpv, uuuuu, va, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
       if (obj instanceof idtm.Variable) {
         pos = this.allocHeap(obj);
         if (!((obj.type != null) && obj.type === obj.TYPE_STRING)) {
@@ -510,17 +517,6 @@
               if (a == null) {
                 throw new Error("printの引数がありません。");
               }
-              /*
-              if a instanceof idtm.Calc2
-                  if a.type? && a.type==a.TYPE_STRING && a.punc=="+"
-                      # 文字列連結だ
-                      # 分解する
-                      @onstack new idtm.Call new idtm.Print,[a.val1]
-                      @onstack new idtm.Call new idtm.Print,[a.val2]
-                      @result.push new wo.stack.Discard
-                      return
-              */
-
               if ((a.type != null) && ((_ref1 = a.type) === a.TYPE_STRING || _ref1 === a.TYPE_BOOLEAN)) {
                 if (a.type === a.TYPE_BOOLEAN) {
                   this.onstack(new idtm.Calc1("to_string", a));
@@ -555,24 +551,62 @@
               if (a == null) {
                 throw new Error("charcodeの引数がありません。");
               }
+              b = obj.args[1];
+              if (b == null) {
+                b = new idtm.Literal(0);
+              }
               this.onstack(a);
               if ((a.type != null) && a.type === a.TYPE_STRING) {
+                this.onstack(b);
+                this.result.push(new wo.arithmetic.Add);
                 this.result.push(new wo.heap.Retrieve);
               }
             } else if (obj.func instanceof idtm.InputChar) {
-              tmpv = new idtm.Variable;
-              pos = this.allocHeap(tmpv);
-              this.result.push(new wo.stack.Push(pos));
-              this.result.push(new wo.io.ReadChar);
-              this.result.push(new wo.stack.Push(pos));
-              this.result.push(new wo.heap.Retrieve);
+              if (v != null) {
+                this.result.push(new wo.stack.Push(this.allocHeap(v)));
+                this.result.push(new wo.io.ReadChar);
+                return;
+              } else {
+                tmpv = new idtm.Variable;
+                pos = this.allocHeap(tmpv);
+                this.result.push(new wo.stack.Push(pos));
+                this.result.push(new wo.io.ReadChar);
+                this.result.push(new wo.stack.Push(pos));
+                this.result.push(new wo.heap.Retrieve);
+              }
             } else if (obj.func instanceof idtm.InputNumber) {
-              tmpv = new idtm.Variable;
-              pos = this.allocHeap(tmpv);
+              if (v != null) {
+                this.result.push(new wo.stack.Push(this.allocHeap(v)));
+                this.result.push(new wo.io.ReadChar);
+                return;
+              } else {
+                tmpv = new idtm.Variable;
+                pos = this.allocHeap(tmpv);
+                this.result.push(new wo.stack.Push(pos));
+                this.result.push(new wo.io.ReadNumber);
+                this.result.push(new wo.stack.Push(pos));
+                this.result.push(new wo.heap.Retrieve);
+              }
+            } else if (obj.func instanceof idtm.CodeToString) {
+              if (v == null) {
+                this.onstack(obj);
+                return;
+              }
+              a = obj.args[0];
+              if (a == null) {
+                throw new Error("charcodeの引数がありません。");
+              }
+              if ((a.type != null) && a.type !== a.TYPE_NUMBER) {
+                throw new Error("codeToStringは数値を引数に呼び出す必要があります。");
+              }
+              pos = this.allocHeap(v);
               this.result.push(new wo.stack.Push(pos));
-              this.result.push(new wo.io.ReadNumber);
-              this.result.push(new wo.stack.Push(pos));
-              this.result.push(new wo.heap.Retrieve);
+              this.onstack(a);
+              this.result.push(new wo.heap.Store);
+              this.result.push(new wo.stack.Push(pos + 1));
+              this.result.push(new wo.stack.Push(0));
+              this.result.push(new wo.heap.Store);
+              return;
             } else {
               throw new Error("ん？");
             }
@@ -581,22 +615,47 @@
             args = obj.args;
             _ref3 = obj.func.start.vars;
             for (i = _l = 0, _len2 = _ref3.length; _l < _len2; i = ++_l) {
-              v = _ref3[i];
+              va = _ref3[i];
               if (args[i] == null) {
                 throw new Error("引数が足りません");
               }
-              this.calc(args[i], v);
+              this.calc(args[i], va);
               if (args[i].type != null) {
-                if (v.type != null) {
-                  if (args[i].type !== v.type) {
-                    v.type = v.TYPE_UNKNOWN;
+                if (va.type != null) {
+                  if (args[i].type !== va.type) {
+                    va.type = v.TYPE_UNKNOWN;
                   }
                 } else {
-                  v.type = args[i].type;
+                  va.type = args[i].type;
                 }
               }
             }
             this.result.push(new wo.flow.Call(lb));
+            if ((v != null) && (obj.func.type != null) && obj.func.type === obj.func.TYPE_STRING) {
+              newpos = this.allocHeap(v);
+              this.result.push(new wo.stack.Push(0));
+              lb2 = this.getLabel();
+              endlb2 = this.getLabel();
+              this.result.push(new wo.flow.Label(lb2));
+              this.result.push(new wo.stack.Duplicate);
+              this.result.push(new wo.stack.Copy(2));
+              this.result.push(new wo.arithmetic.Add);
+              this.result.push(new wo.heap.Retrieve);
+              this.result.push(new wo.stack.Duplicate);
+              this.result.push(new wo.stack.Copy(2));
+              this.result.push(new wo.stack.Push(newpos));
+              this.result.push(new wo.arithmetic.Add);
+              this.result.push(new wo.stack.Swap);
+              this.result.push(new wo.heap.Store);
+              this.result.push(new wo.flow.JumpZero(endlb2));
+              this.result.push(new wo.stack.Push(1));
+              this.result.push(new wo.arithmetic.Add);
+              this.result.push(new wo.flow.Jump(lb2));
+              this.result.push(new wo.flow.Label(endlb2));
+              this.result.push(new wo.stack.Discard);
+              this.result.push(new wo.stack.Discard);
+              return;
+            }
           }
         }
       }

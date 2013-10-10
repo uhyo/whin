@@ -867,6 +867,14 @@ JSParser.prototype.parse=function(str){
 
 		}
 		getNext(PunctuatorToken,")");
+		// 独自拡張文法（関数の返り値）
+		var ide2;
+		if(next=getNext(PunctuatorToken,":",false)){
+			ide2=getNext(IdentifierToken);
+			if(ide2.value!=="string" && ide2.value!=="number" && ide2.value!=="boolean"){
+				throw new SyntaxError();
+			}
+		}
 		getNext(PunctuatorToken,"{");
 		var body=getFunctionBody();
 		getNext(PunctuatorToken,"}");
@@ -874,6 +882,8 @@ JSParser.prototype.parse=function(str){
 		ret.name=ide;
 		ret.functionbody=body;
 		ret.paramlist=paramlist;
+		//独自拡張
+		ret.returnType=ide2 && ide2.value;
 		return ret;
 	}
 	function getFunctionBody(){
@@ -1232,6 +1242,7 @@ function FunctionDeclaration(){
 	this.name=null;	//Identifier
 	this.paramlist=null;	//[Identifier]
 	this.functionbody=null;	//SourceElements
+	this.returnType=null;	//独自拡張(string)
 }
 FunctionDeclaration.prototype.tokenize=function(manager){
 	var ret=new TokenList(
@@ -1245,8 +1256,15 @@ FunctionDeclaration.prototype.tokenize=function(manager){
 		new PunctuatorToken("(")
 	);
 	ret=ret.concat(this.paramlist);
+	ret.push(new PunctuatorToken(")"));
+	//独自拡張
+	if(this.returnType){
+		ret.push(
+			new PunctuaterToken(":"),
+			new IdentifierToken(this.returnType)
+		);
+	}
 	ret.push(
-		new PunctuatorToken(")"),
 		new PunctuatorToken("{"),
 		manager.newline()
 	);
