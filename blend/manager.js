@@ -66,6 +66,10 @@
   WSToken = (function() {
     function WSToken() {}
 
+    WSToken.prototype.likeIdentifier = function() {
+      return false;
+    };
+
     return WSToken;
 
   })();
@@ -132,11 +136,13 @@
       var ret;
       ret = new WSBuffer(this.ops.concat([]));
       ret.index = this.index;
+      ret.bindex = this.bindex;
+      ret.buf = this.buf;
       ret.push0_mode = this.push0_mode;
       return ret;
     };
 
-    WSBuffer.prototype.takeJust = function(last) {
+    WSBuffer.prototype.takeJust = function(type, last) {
       var char;
       if (!this.buf[this.bindex]) {
         if (!this.ops[this.index]) {
@@ -144,15 +150,17 @@
             if (last) {
               return null;
             }
-            this.buf += " ";
+            if (type === "indent") {
+              this.buf += "\t";
+            } else {
+              this.buf += " ";
+            }
           } else {
-            this.buf = "   ";
-            this.bindex = 0;
+            this.buf += "   ";
             this.push0_mode = true;
           }
         } else {
-          this.buf = this.ops[this.index].getCode();
-          this.bindex = 0;
+          this.buf += this.ops[this.index].getCode();
           this.index++;
         }
       }
@@ -160,8 +168,8 @@
       if (char === " " || char === "\t") {
         /*
         process.stdout.write (switch char
-            when " " then "[SP#{@index}]"
-            when "\t" then "[TB#{@index}]"
+            when " " then "[SP#{@bindex}]"
+            when "\t" then "[TB#{@bindex}]"
         ).yellow
         */
 
@@ -179,9 +187,11 @@
             this.buf += "\n";
             this.push0_mode = false;
           } else {
-            this.buf = "\n\n\n";
-            this.bindex = 0;
+            this.buf += "\n\n\n";
           }
+        } else {
+          this.buf += this.ops[this.index].getCode();
+          this.index++;
         }
       }
       char = this.buf[this.bindex];
@@ -200,9 +210,8 @@
         op = _ref3[_i];
         result += op.getCode();
       }
+      this.bindex = this.buf.length;
       this.index = this.ops.length;
-      this.buf = "";
-      this.bindex = 0;
       return result;
     };
 
@@ -212,7 +221,7 @@
       }
       this.bindex -= num;
       if (this.bindex < 0) {
-        return this.bindex = 0;
+        this.bindex = 0;
       }
     };
 
@@ -263,7 +272,7 @@
                 to = t.level * this.indentWidth;
                 now = 0;
                 char = null;
-                while (char = buf.takeJust()) {
+                while (char = buf.takeJust("indent")) {
                   switch (char) {
                     case " ":
                       tmp += " ";
@@ -295,7 +304,7 @@
                   break;
                 }
               } else if (t instanceof Just) {
-                char = buf.takeJust();
+                char = buf.takeJust("just");
                 if (char == null) {
                   tmp = null;
                   break;
@@ -303,7 +312,7 @@
                 tmp += char;
               } else if (t instanceof NewLine) {
                 char = null;
-                while (char = buf.takeJust(true)) {
+                while (char = buf.takeJust("just", true)) {
                   tmp += char;
                 }
                 char = buf.takeNewLine();
@@ -320,7 +329,7 @@
                 for (_j = 0, _len1 = str.length; _j < _len1; _j++) {
                   ch = str[_j];
                   if (ch === " " || ch === "\t") {
-                    char = buf.takeJust();
+                    char = buf.takeJust("just");
                     if (ch === char) {
                       tmp += ch;
                       continue;
@@ -349,7 +358,7 @@
             tmp = "";
             char = null;
             buf = this.buffer.clone();
-            while (char = buf.takeJust()) {
+            while (char = buf.takeJust("just", true)) {
               tmp += char;
             }
             char = buf.takeNewLine();

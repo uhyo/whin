@@ -28,6 +28,7 @@ class WSManager extends parser.TokenizeManager
 
 #tokens
 class WSToken
+    likeIdentifier:->false
 
 class Just extends WSToken
     toString:->"[Just]"
@@ -51,9 +52,11 @@ class WSBuffer
     clone:->
         ret=new WSBuffer @ops.concat []
         ret.index=@index
+        ret.bindex=@bindex
+        ret.buf=@buf
         ret.push0_mode=@push0_mode
         ret
-    takeJust:(last)->#last: 行末のスペースの場合
+    takeJust:(type,last)->#type: "indent"/"just" どんなのが欲しいか last: 行末のスペースの場合
         # スペースをとる
         unless @buf[@bindex]
             # 次の文字がない
@@ -63,23 +66,24 @@ class WSBuffer
                     if last
                         # もう終わっていいよ!
                         return null
-                    @buf+=" "
+                    if type=="indent"
+                        @buf+="\t"
+                    else
+                        @buf+=" "
                 else
-                    @buf="   "
-                    @bindex=0
+                    @buf+="   "
                     # あとはいくらスペースたしてもOK(Push 0になる)
                     @push0_mode=true
             else
                 # 次の命令を供給
-                @buf=@ops[@index].getCode()
-                @bindex=0
+                @buf+=@ops[@index].getCode()
                 @index++
         char=@buf[@bindex]
         if char in [" ","\t"]
             ###
             process.stdout.write (switch char
-                when " " then "[SP#{@index}]"
-                when "\t" then "[TB#{@index}]"
+                when " " then "[SP#{@bindex}]"
+                when "\t" then "[TB#{@bindex}]"
             ).yellow
             ###
             @bindex++
@@ -94,8 +98,11 @@ class WSBuffer
                     @push0_mode=false
                 else
                     # Endでごまかす
-                    @buf="\n\n\n"
-                    @bindex=0
+                    @buf+="\n\n\n"
+            else
+                # 次の命令を供給
+                @buf+=@ops[@index].getCode()
+                @index++
         char=@buf[@bindex]
         if char=="\n"
             #process.stdout.write "[LF#{@index}]".yellow
@@ -106,15 +113,15 @@ class WSBuffer
         result=@buf.slice @bindex
         for op in @ops.slice @index
             result+=op.getCode()
+        @bindex=@buf.length
         @index=@ops.length
-        @buf=""
-        @bindex=0
         result
     back:(num=1)->
         # 戻る
         @bindex-=num
         if @bindex<0
             @bindex=0
+        return
         #process.stdout.write "back".red
 
 
@@ -154,7 +161,7 @@ class Blender
                             #console.log "Indent! to #{to}".red
                             now=0
                             char=null
-                            while char=buf.takeJust()
+                            while char=buf.takeJust "indent"
                                 switch char
                                     when " "
                                         tmp+=" "
@@ -185,7 +192,7 @@ class Blender
                             # ぶじインデントしたでー
                         else if t instanceof Just
                             # ひとつほしい
-                            char=buf.takeJust()
+                            char=buf.takeJust "just"
                             unless char?
                                 # 無理だわ…
                                 tmp=null
@@ -195,7 +202,7 @@ class Blender
                             # 行がおわるぞ!
                             char=null
                             # 末尾にスペースを流し込む
-                            while char=buf.takeJust true
+                            while char=buf.takeJust "just",true
                                 tmp+=char
                             char=buf.takeNewLine()
                             unless char?
@@ -212,7 +219,7 @@ class Blender
                             for ch in str
                                 if ch in [" ","\t"]
                                     # これは危険だ!
-                                    char=buf.takeJust()
+                                    char=buf.takeJust "just"
                                     if ch==char
                                         # OK!
                                         tmp+=ch
@@ -239,7 +246,7 @@ class Blender
                     tmp=""
                     char=null
                     buf=@buffer.clone()
-                    while char=buf.takeJust()
+                    while char=buf.takeJust "just",true
                         tmp+=char
                     char=buf.takeNewLine()
                     unless char?

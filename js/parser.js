@@ -1135,6 +1135,8 @@ Token.prototype.equal=function(type,value){
 	return this instanceof type && this.value==value;
 };
 Token.prototype.tokenize=function(manager){return new TokenList(this)};
+//Identifierっぽいトークン
+Token.prototype.likeIdentifier=function(){return false};
 
 //ダミー
 function UndefinedToken(v){
@@ -1175,6 +1177,7 @@ IdentifierToken.prototype=Object.create(Token.prototype);
 IdentifierToken.prototype.toHTML=function(){
 	return "<span class='token identifier'>"+this.value+"</span>";
 };
+IdentifierToken.prototype.likeIdentifier=function(){return true};
 
 function LiteralToken(v){
 	Token.apply(this,arguments);
@@ -1183,6 +1186,7 @@ LiteralToken.prototype=Object.create(Token.prototype);
 LiteralToken.prototype.toHTML=function(){
 	return "<span class='token literal'>"+this.value+"</span>";
 };
+LiteralToken.prototype.likeIdentifier=function(){return true};
 
 function StringLiteralToken(v){
 	LiteralToken.apply(this,arguments);
@@ -1213,6 +1217,7 @@ KeywordToken.prototype.tokenize=function(manager){
 	}
 	return ret;
 };
+KeywordToken.prototype.likeIdentifier=function(){return true};
 function FutureReservedWordToken(v){
 	Token.apply(this,arguments);
 }
@@ -1220,6 +1225,7 @@ FutureReservedWordToken.prototype=Object.create(Token.prototype);
 FutureReservedWordToken.prototype.toHTML=function(){
 	return "<span class='token futurereservedword'>"+this.value+"</span>";
 };
+FutureReservedWordToken.prototype.likeIdentifier=function(){return true};
 //-----------------------------------------
 
 function Statements(){
@@ -1255,7 +1261,12 @@ FunctionDeclaration.prototype.tokenize=function(manager){
 	ret.push(
 		new PunctuatorToken("(")
 	);
-	ret=ret.concat(this.paramlist);
+	for(var i=0,l=this.paramlist.length;i<l;i++){
+		if(i){
+			ret.push(new PunctuatorToken(","));
+		}
+		ret.push(this.paramlist[i]);
+	}
 	ret.push(new PunctuatorToken(")"));
 	//独自拡張
 	if(this.returnType){
@@ -1582,7 +1593,7 @@ function ThrowStatement(){
 }
 ThrowStatement.prototype=Object.create(Statement.prototype);
 ThrowStatement.prototype.tokenize=function(manager){
-	return new TokenList([new KeywordToken("throw"),manager.just()].concat(this.exp.tokenize(manager)));
+	return new TokenList([new KeywordToken("throw"),manager.just()]).concat(this.exp.tokenize(manager));
 }
 
 function TryStatement(){
@@ -1635,9 +1646,18 @@ function Expression(){
 Expression.prototype.tokenize=function(manager){
 	var ret=new TokenList();
 	this.parts.forEach(function(x){
+		var last,lastflg = (last=ret[ret.length-1]) && last.likeIdentifier();
 		if(x.tokenize){
-			ret=ret.concat(x.tokenize(manager));
+			var tks=x.tokenize(manager);
+			if(tks[0].likeIdentifier() && lastflg){
+				//間あけよ
+				ret.push(manager.just());
+			}
+			ret=ret.concat(tks);
 		}else{
+			if(lastflg && (x instanceof Token) && x.likeIdentifier()){
+				ret.push(manager.just());
+			}
 			ret.push(x);
 		}
 	});
