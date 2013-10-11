@@ -11,6 +11,7 @@ class Compiler
         # ヒープ管理(Variableをいれる)
         @heap=[]
     compile:(ops)->   #[idtm.Operation]
+        # ダミーをひとつ積んでおこう!（ws into js時に）
         for op in ops
             @maincalc op
         @result
@@ -757,7 +758,6 @@ class Compiler
             @result.push new wo.stack.Push pos
             @result.push new wo.stack.Swap
             @result.push new wo.heap.Store
-
     getLabel:(lb)->
         thislabel=@myLabelnumber
         if lb instanceof idtm.Label

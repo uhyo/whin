@@ -173,6 +173,16 @@ ops=exports=module.exports=
                         throw new Error "Cannot parse number"
                     env.store env.pop(),num
                     callback()
+    # 実際には存在しない内部命令
+    other:
+        # 何らかのマーク
+        Mark:class Mark extends Operation
+            @code:""
+            constructor:(@sign)->   #sign:string
+            on:(env)->
+            toString:->
+                "#{super}(#{@sign})"
+
         
 exports.Parser=class Parser
     constructor:(@io)->

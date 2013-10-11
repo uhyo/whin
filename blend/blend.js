@@ -31,7 +31,7 @@
       wsparser = new operations.Parser(loader);
       return wsparser.parse(false, function(ops) {
         var blender, code;
-        blender = new manager.Blender(8, 8, tokens, ops);
+        blender = new manager.Blender(4, 4, tokens, ops, 2);
         code = blender.blend();
         return process.stdout.write(code);
       });

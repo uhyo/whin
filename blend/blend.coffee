@@ -18,7 +18,7 @@ fs.readFile process.argv[2],{encoding:"utf8"},(err,data)->
     loader.load process.argv[3],->
         wsparser=new operations.Parser loader
         wsparser.parse false,(ops)->
-            blender=new manager.Blender 8,8,tokens,ops
+            blender=new manager.Blender 4,4,tokens,ops,2
             code=blender.blend()
 
             process.stdout.write code#.replace(/\u0020/g,"[SP]".grey).replace(/\t/g,"[TB]".grey)
