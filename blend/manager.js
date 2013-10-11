@@ -120,15 +120,17 @@
   exports.WSManager = WSManager;
 
   WSBuffer = (function() {
-    function WSBuffer(buffer) {
-      this.buffer = buffer;
+    function WSBuffer(ops) {
+      this.ops = ops;
       this.index = 0;
+      this.bindex = 0;
+      this.buf = "";
       this.push0_mode = false;
     }
 
     WSBuffer.prototype.clone = function() {
       var ret;
-      ret = new WSBuffer(this.buffer);
+      ret = new WSBuffer(this.ops.concat([]));
       ret.index = this.index;
       ret.push0_mode = this.push0_mode;
       return ret;
@@ -136,18 +138,25 @@
 
     WSBuffer.prototype.takeJust = function(last) {
       var char;
-      if (!this.buffer[this.index]) {
-        if (this.push0_mode) {
-          if (last) {
-            return null;
+      if (!this.buf[this.bindex]) {
+        if (!this.ops[this.index]) {
+          if (this.push0_mode) {
+            if (last) {
+              return null;
+            }
+            this.buf += " ";
+          } else {
+            this.buf = "   ";
+            this.bindex = 0;
+            this.push0_mode = true;
           }
-          this.buffer += " ";
         } else {
-          this.buffer += "   ";
-          this.push0_mode = true;
+          this.buf = this.ops[this.index].getCode();
+          this.bindex = 0;
+          this.index++;
         }
       }
-      char = this.buffer[this.index];
+      char = this.buf[this.bindex];
       if (char === " " || char === "\t") {
         /*
         process.stdout.write (switch char
@@ -156,7 +165,7 @@
         ).yellow
         */
 
-        this.index++;
+        this.bindex++;
         return char;
       }
       return null;
@@ -164,26 +173,36 @@
 
     WSBuffer.prototype.takeNewLine = function() {
       var char;
-      if (!this.buffer[this.index]) {
-        if (this.push0_mode) {
-          this.buffer += "\n";
-          this.push0_mode = false;
-        } else {
-          this.buffer += "\n\n\n";
+      if (!this.buf[this.bindex]) {
+        if (!this.ops[this.index]) {
+          if (this.push0_mode) {
+            this.buf += "\n";
+            this.push0_mode = false;
+          } else {
+            this.buf = "\n\n\n";
+            this.bindex = 0;
+          }
         }
       }
-      char = this.buffer[this.index];
+      char = this.buf[this.bindex];
       if (char === "\n") {
-        this.index++;
+        this.bindex++;
         return char;
       }
       return null;
     };
 
     WSBuffer.prototype.takeAll = function() {
-      var result;
-      result = this.buffer.slice(this.index);
-      this.index = this.buffer.length;
+      var op, result, _i, _len, _ref3;
+      result = this.buf.slice(this.bindex);
+      _ref3 = this.ops.slice(this.index);
+      for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+        op = _ref3[_i];
+        result += op.getCode();
+      }
+      this.index = this.ops.length;
+      this.buf = "";
+      this.bindex = 0;
       return result;
     };
 
@@ -191,9 +210,9 @@
       if (num == null) {
         num = 1;
       }
-      this.index -= num;
-      if (this.index < 0) {
-        return this.index = 0;
+      this.bindex -= num;
+      if (this.bindex < 0) {
+        return this.bindex = 0;
       }
     };
 
@@ -207,9 +226,7 @@
       this.indentWidth = indentWidth;
       this.tokens = tokens;
       this.ops = ops;
-      this.buffer = new WSBuffer(this.ops.map(function(x) {
-        return x.getCode();
-      }).join(""));
+      this.buffer = new WSBuffer(this.ops);
       this.infinity_spaces = false;
     }
 

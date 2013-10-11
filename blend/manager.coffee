@@ -43,28 +43,38 @@ exports.WSManager=WSManager
 
 # WSコード供給バッファ
 class WSBuffer
-    constructor:(@buffer)->
-        @index=0
+    constructor:(@ops)->
+        @index=0    #@opsの
+        @bindex=0   #@bufの
+        @buf="" # 現在の
         @push0_mode=false
     clone:->
-        ret=new WSBuffer @buffer
+        ret=new WSBuffer @ops.concat []
         ret.index=@index
         ret.push0_mode=@push0_mode
         ret
     takeJust:(last)->#last: 行末のスペースの場合
         # スペースをとる
-        unless @buffer[@index]
-            # もうない!
-            if @push0_mode
-                if last
-                    # もう終わっていいよ!
-                    return null
-                @buffer+=" "
+        unless @buf[@bindex]
+            # 次の文字がない
+            unless @ops[@index]
+                # もうない!
+                if @push0_mode
+                    if last
+                        # もう終わっていいよ!
+                        return null
+                    @buf+=" "
+                else
+                    @buf="   "
+                    @bindex=0
+                    # あとはいくらスペースたしてもOK(Push 0になる)
+                    @push0_mode=true
             else
-                @buffer+="   "
-                # あとはいくらスペースたしてもOK(Push 0になる)
-                @push0_mode=true
-        char=@buffer[@index]
+                # 次の命令を供給
+                @buf=@ops[@index].getCode()
+                @bindex=0
+                @index++
+        char=@buf[@bindex]
         if char in [" ","\t"]
             ###
             process.stdout.write (switch char
@@ -72,33 +82,39 @@ class WSBuffer
                 when "\t" then "[TB#{@index}]"
             ).yellow
             ###
-            @index++
+            @bindex++
             return char
         return null
     takeNewLine:->
-        unless @buffer[@index]
-            if @push0_mode
-                # Push 0を終了させる
-                @buffer+="\n"
-                @push0_mode=false
-            else
-                # Endでごまかす
-                @buffer+="\n\n\n"
-        char=@buffer[@index]
+        unless @buf[@bindex]
+            unless @ops[@index]
+                if @push0_mode
+                    # Push 0を終了させる
+                    @buf+="\n"
+                    @push0_mode=false
+                else
+                    # Endでごまかす
+                    @buf="\n\n\n"
+                    @bindex=0
+        char=@buf[@bindex]
         if char=="\n"
             #process.stdout.write "[LF#{@index}]".yellow
-            @index++
+            @bindex++
             return char
         return null
     takeAll:->
-        result=@buffer.slice @index
-        @index=@buffer.length
+        result=@buf.slice @bindex
+        for op in @ops.slice @index
+            result+=op.getCode()
+        @index=@ops.length
+        @buf=""
+        @bindex=0
         result
     back:(num=1)->
         # 戻る
-        @index-=num
-        if @index<0
-            @index=0
+        @bindex-=num
+        if @bindex<0
+            @bindex=0
         #process.stdout.write "back".red
 
 
@@ -106,7 +122,7 @@ class Blender
     #tabWidth: タブがスペース何個分にあたるか indentWidth:インデントがスペース何個分にあたるか
     constructor:(@tabWidth,@indentWidth,@tokens,@ops)->
         # バッファに入れる
-        @buffer=new WSBuffer @ops.map((x)->x.getCode()).join ""
+        @buffer=new WSBuffer @ops
         # スペースを水増しモード
         @infinity_spaces=false
 
