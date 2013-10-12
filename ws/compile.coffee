@@ -586,6 +586,277 @@ class Compiler
                         @onstack new idtm.Calc1 "to_boolean",obj.val2
                         # 論理積
                         @result.push new wo.arithmetic.Multiply
+                    when "|","&","^"
+                        # ビットごと論理和
+                        pos=null
+                        if v?
+                            pos=@allocHeap v
+                        else
+                            tmpv=new idtm.Variable
+                            tmpv.type=tmpv.TYPE_NUMBER
+                            pos=@allocHeap tmpv
+                        baiv=new idtm.Variable
+                        baiv.type=baiv.TYPE_NUMBER
+                        baipos=@allocHeap baiv
+                        @result.push new wo.stack.Push baipos
+                        @result.push new wo.stack.Push 1
+                        @result.push new wo.heap.Store
+                        # 結果いれる
+                        @result.push new wo.stack.Push pos
+                        @result.push new wo.stack.Push 0
+                        @result.push new wo.heap.Store
+                        @onstack new idtm.Calc1 "to_number",obj.val1
+                        @onstack new idtm.Calc1 "to_number",obj.val2
+                        lb=@getLabel()
+                        @result.push new wo.flow.Label lb
+                        # スタック状況: * [val1] [val2]
+                        @result.push new wo.stack.Duplicate
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Modulo
+                        # スタック状況: * [val1] [val2] [val2%2]
+                        @result.push new wo.stack.Copy 2
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Modulo
+                        # スタック状況: * [val1] [val2] [val2%2] [val1%2]
+                        endlb=@getLabel()
+                        switch obj.punc
+                            when "|"
+                                # ビットごと論理和
+                                lb2=@getLabel()
+                                lb3=@getLabel()
+                                @result.push new wo.flow.JumpZero lb2
+                                # スタック状況: * [val1] [val2] [val2%2]
+                                # OK!(1をつむ)
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.stack.Slide 1
+                                # スタック状況: * [val1] [val2] [1]
+                                @result.push new wo.flow.Jump endlb
+                                @result.push new wo.flow.Label lb2
+                                # スタック状況: * [val1] [val2] [val2%2]
+                                @result.push new wo.flow.JumpZero lb3
+                                # OK!(1をつむ)
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.flow.Jump endlb
+                                @result.push new wo.flow.Label lb3
+                                # 0だった
+                                @result.push new wo.stack.Push 0
+                            when "&"
+                                # ビットごと論理積
+                                lb2=@getLabel()
+                                lb3=@getLabel()
+                                @result.push new wo.flow.JumpZero lb2
+                                @result.push new wo.flow.JumpZero lb3
+                                # スタック状況: * [val1] [val2]
+                                # 2つとも0ではない!
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.flow.Jump endlb
+                                @result.push new wo.flow.Label lb2
+                                # スタック状況: * [val1] [val2] [val2%2]
+                                @result.push new wo.stack.Discard
+                                @result.push new wo.flow.Label lb3
+                                # スタック状況: * [val1] [val2]
+                                @result.push new wo.stack.Push 0
+                            when "^"
+                                lb2=@getLabel()
+                                lb3=@getLabel()
+                                lb4=@getLabel()
+                                @result.push new wo.flow.JumpZero lb2
+                                # スタック状況: * [val1] [val2] [val2%2]
+                                # val1は1だった。val2が0なら1
+                                @result.push new wo.flow.JumpZero lb3
+                                # val2も1だから0
+                                @result.push new wo.stack.Push 0
+                                @result.push new wo.flow.Jump endlb
+                                @result.push new wo.flow.Label lb3
+                                # val1=1,val2=0
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.flow.Jump endlb
+                                @result.push new wo.flow.Label lb2
+                                # スタック状況: * [val1] [val2] [val2%2]
+                                # val1は0だった。val2が1なら1
+                                @result.push new wo.flow.JumpZero lb4
+                                # val2も1だから1
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.flow.Jump endlb
+                                @result.push new wo.flow.Label lb4
+                                # val1=0,val2=0
+                                @result.push new wo.stack.Push 0
+                                @result.push new wo.flow.Jump endlb
+
+
+                        @result.push new wo.flow.Label endlb
+                        # スタック状況: * [val1] [val2] [0/1]
+                        @result.push new wo.stack.Push baipos
+                        @result.push new wo.heap.Retrieve
+                        @result.push new wo.stack.Duplicate
+                        # スタック状況: * [val1] [val2] [0/1] [bai] [bai]
+                        @result.push new wo.stack.Copy 2
+                        @result.push new wo.arithmetic.Multiply
+                        # スタック状況: * [val1] [val2] [0/1] [bai] [0/bai]
+                        @result.push new wo.stack.Push pos
+                        @result.push new wo.heap.Retrieve
+                        @result.push new wo.arithmetic.Add
+                        # スタック状況: * [val1] [val2] [0/1] [bai] [result+(0/bai)]
+                        @result.push new wo.stack.Push pos
+                        @result.push new wo.stack.Swap
+                        @result.push new wo.heap.Store
+                        # スタック状況: * [val1] [val2] [0/1] [bai]
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Multiply
+                        # スタック状況: * [val1] [val2] [0/1] [bai*2]
+                        @result.push new wo.stack.Slide 1
+                        @result.push new wo.stack.Push baipos
+                        @result.push new wo.stack.Swap
+                        @result.push new wo.heap.Store
+                        # スタック状況: * [val1] [val2]
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Divide
+                        # スタック状況: * [val1] [val2/2]
+                        @result.push new wo.stack.Swap
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Divide
+                        # スタック状況: * [val2/2] [val1/2]
+                        # 両方0になったらおわる
+                        @result.push new wo.stack.Duplicate
+                        # スタック状況: * [val2/2] [val1/2] [val1/2]
+                        endlb2=@getLabel()
+                        @result.push new wo.flow.JumpZero endlb2
+                        # 0ではない!クリア
+                        @result.push new wo.flow.Jump lb
+                        @result.push new wo.flow.Label endlb2
+                        # スタック状況: * [val2/2] [val1/2]
+                        endlb3=@getLabel()
+                        @result.push new wo.stack.Copy 1
+                        @result.push new wo.flow.JumpZero endlb3
+                        # 0ではない!クリア
+                        @result.push new wo.flow.Jump lb
+                        @result.push new wo.flow.Label endlb3
+                        # 両方0だ! おわり
+                        unless v?
+                            # 変数がないのでスタックに置く
+                            @result.push new wo.stack.Push pos
+                            @result.push new wo.stack.Slide 2
+                            # スタック状況: * [pos]
+                            @result.push new wo.stack.Retrieve
+                        else
+                            @result.push new wo.stack.Discard
+                            @result.push new wo.stack.Discard
+                            return
+
+
+
+
+                        ###
+                        @result.push new wo.stack.Push -101
+                        @result.push new wo.stack.Push 0
+                        @onstack new idtm.Calc1 "to_number",obj.val1
+                        @onstack new idtm.Calc1 "to_number",obj.val2
+                        lb=@getLabel()
+                        @result.push new wo.flow.Label lb
+                        # スタック状況: * [-101] ... [result] [val1] [val2]
+                        @result.push new wo.stack.Duplicate
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Modulo
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [val2%2]
+                        @result.push new wo.stack.Copy 2
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Modulo
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [val2%2] [val1%1]
+                        endlb=@getLabel()
+                        endlb2=@getLabel()
+                        enendlb=@getLabel()
+                        switch obj.punc
+                            when "|"
+                                # 両方0なら0,他は1
+                                lb2=@getLabel()
+                                @result.push new wo.stack.Push 0
+                                @result.push new wo.stack.Swap
+                                # スタック状況: * [-101] ... [result] [val1] [val2] [val2%2] [0] [val1%2]
+                                @result.push new wo.flow.JumpZero lb2
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.arithmetic.Add
+                                @result.push new wo.stack.Slide 1
+                                # スタック状況: * [-101] ... [result] [val1] [val2] [1]
+                                @result.push new wo.flow.Jump enendlb
+                                @result.push new wo.flow.Label lb2
+                                # val1が0だったとき
+                                @result.push new wo.stack.Swap
+                                # スタック状況: * [-101] ... [result] [val1] [val2] [0] [val2%2]
+                                @result.push new wo.flow.JumpZero enendlb
+                                @result.push new wo.stack.Push 1
+                                @result.push new wo.arithmetic.Add
+                                # スタック状況: * [-101] ... [result] [val1] [val2] [1]
+                        @result.push new wo.flow.Label enendlb
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [0or1] 
+                        @result.push new wo.stack.Copy 3
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Multiply
+                        @result.push new wo.arithmetic.Add
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [2*result+(0or1)] 
+                        @result.push new wo.stack.Push -100
+                        @result.push new wo.stack.Swap
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] 
+                        # [-100]: この下3つを消していいフラグ [-101]: 消すのはここで終了フラグ
+                        @result.push new wo.stack.Copy 3
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Divide
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [val1/2]
+                        @result.push new wo.stack.Duplicate
+                        @result.push new wo.flow.JumpZero endlb # 0だったら抜けるかも
+                        @result.push new wo.stack.Copy 3
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Divide
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [val1/2] [val2/2]
+                        @result.push new wo.flow.Jump lb
+                        @result.push new wo.flow.Label endlb
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [0]
+                        @result.push new wo.stack.Copy 3
+                        @result.push new wo.stack.Push 2
+                        @result.push new wo.arithmetic.Divide
+                        @result.push new wo.stack.Duplicate
+                        @result.push new wo.flow.JumpZero endlb2 # 0だったら抜ける
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [0] [val2/2]
+                        @result.push new wo.flow.Jump lb
+                        @result.push new wo.flow.Label endlb2
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [0] [0]
+                        # 結果を保存
+                        pos=null
+                        if v?
+                            pos=@allocHeap v
+                        else
+                            tmpv=new idtm.Variable
+                            tmpv.type=tmpv.TYPE_NUMBER
+                            pos=@allocHeap tmpv
+                        @result.push new wo.stack.Push pos
+                        @result.push new wo.stack.Copy 3
+                        @result.push new wo.heap.Store
+                        # 片付けしていく
+                        @result.push new wo.stack.Slide 2
+                        @result.push new wo.stack.Discard
+                        # スタック状況: * [-101] ... [result] [val1] [val2] [-100]
+                        lb2=@getLabel()
+                        @result.push new wo.flow.Label lb2
+                        # スタック状況: * ... [-100/-101]
+                        @result.push new wo.stack.Push 101
+                        @result.push new wo.arithmetic.Add
+                        # スタック状況: * ... [1/0]
+                        lb3=@getLabel()
+                        @result.push new wo.flow.JumpZero lb3
+                        # -100だった・・・下の3つを抜く
+                        # スタック状況: * [-101] ... [result] [val1] [val2]
+                        @result.push new wo.stack.Slide 2
+                        @result.push new wo.stack.Discard
+                        @result.push new wo.flow.Jump lb2
+                        @result.push new wo.flow.Label lb3
+                        # スタック状況: *
+                        unless v?
+                            # スタックにのせる
+                            @result.push new wo.stack.Push pos
+                            @result.push new wo.heap.Retrieve
+                        else
+                            return
+                        ###
+
             else if obj instanceof idtm.Call
                 # 関数はすべてスタックに戻り値を積む予定だし
                 if obj.func instanceof idtm.NativeFunc

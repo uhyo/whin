@@ -636,7 +636,7 @@
                 num = 2 * num + 1;
                 break;
               case "\n":
-                return num;
+                return sign * num;
             }
           }
         };

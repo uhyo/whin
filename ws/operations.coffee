@@ -242,7 +242,7 @@ exports.Parser=class Parser
                         when "\t"
                             num=2*num+1
                         when "\n"
-                            return num
+                            return sign*num
             readLabel=->
                 label=""
                 while true

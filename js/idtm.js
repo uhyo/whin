@@ -509,6 +509,9 @@
         case ">=":
         case "<=":
         case "<":
+        case "|":
+        case "&":
+        case "^":
         case "||":
         case "&&":
           mae = this.calc(mae);

@@ -1,4 +1,5 @@
 fs=require 'fs'
+colors=require 'colors'
 class IO
     readChar:(callback)->
     readLine:(callback)->
@@ -56,7 +57,8 @@ exports.Console=class extends IO
                 if chunk=="\r"
                     chunk="\n"
                 process.stdin.pause()
-                process.stdout.write chunk
+                if process.stdin.isTTY && process.stdout.isTTY
+                    process.stdout.write chunk.grey
                 callback chunk
     readLine:(callback)->
         line=""

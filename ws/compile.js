@@ -147,7 +147,7 @@
     };
 
     Compiler.prototype.calc = function(obj, v) {
-      var a, alloctets, args, ato, b, c, code, endlb, endlb2, i, idx, lb, lb2, lb3, newpos, octets, pos, str, tmpend, tmplb, tmpv, uuuuu, va, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
+      var a, alloctets, args, ato, b, baipos, baiv, c, code, endlb, endlb2, endlb3, i, idx, lb, lb2, lb3, lb4, newpos, octets, pos, str, tmpend, tmplb, tmpv, uuuuu, va, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref2, _ref3;
       if (obj instanceof idtm.Variable) {
         pos = this.allocHeap(obj);
         if (!((obj.type != null) && obj.type === obj.TYPE_STRING)) {
@@ -509,6 +509,237 @@
               this.onstack(new idtm.Calc1("to_boolean", obj.val1));
               this.onstack(new idtm.Calc1("to_boolean", obj.val2));
               this.result.push(new wo.arithmetic.Multiply);
+              break;
+            case "|":
+            case "&":
+            case "^":
+              pos = null;
+              if (v != null) {
+                pos = this.allocHeap(v);
+              } else {
+                tmpv = new idtm.Variable;
+                tmpv.type = tmpv.TYPE_NUMBER;
+                pos = this.allocHeap(tmpv);
+              }
+              baiv = new idtm.Variable;
+              baiv.type = baiv.TYPE_NUMBER;
+              baipos = this.allocHeap(baiv);
+              this.result.push(new wo.stack.Push(baipos));
+              this.result.push(new wo.stack.Push(1));
+              this.result.push(new wo.heap.Store);
+              this.result.push(new wo.stack.Push(pos));
+              this.result.push(new wo.stack.Push(0));
+              this.result.push(new wo.heap.Store);
+              this.onstack(new idtm.Calc1("to_number", obj.val1));
+              this.onstack(new idtm.Calc1("to_number", obj.val2));
+              lb = this.getLabel();
+              this.result.push(new wo.flow.Label(lb));
+              this.result.push(new wo.stack.Duplicate);
+              this.result.push(new wo.stack.Push(2));
+              this.result.push(new wo.arithmetic.Modulo);
+              this.result.push(new wo.stack.Copy(2));
+              this.result.push(new wo.stack.Push(2));
+              this.result.push(new wo.arithmetic.Modulo);
+              endlb = this.getLabel();
+              switch (obj.punc) {
+                case "|":
+                  lb2 = this.getLabel();
+                  lb3 = this.getLabel();
+                  this.result.push(new wo.flow.JumpZero(lb2));
+                  this.result.push(new wo.stack.Push(1));
+                  this.result.push(new wo.stack.Slide(1));
+                  this.result.push(new wo.flow.Jump(endlb));
+                  this.result.push(new wo.flow.Label(lb2));
+                  this.result.push(new wo.flow.JumpZero(lb3));
+                  this.result.push(new wo.stack.Push(1));
+                  this.result.push(new wo.flow.Jump(endlb));
+                  this.result.push(new wo.flow.Label(lb3));
+                  this.result.push(new wo.stack.Push(0));
+                  break;
+                case "&":
+                  lb2 = this.getLabel();
+                  lb3 = this.getLabel();
+                  this.result.push(new wo.flow.JumpZero(lb2));
+                  this.result.push(new wo.flow.JumpZero(lb3));
+                  this.result.push(new wo.stack.Push(1));
+                  this.result.push(new wo.flow.Jump(endlb));
+                  this.result.push(new wo.flow.Label(lb2));
+                  this.result.push(new wo.stack.Discard);
+                  this.result.push(new wo.flow.Label(lb3));
+                  this.result.push(new wo.stack.Push(0));
+                  break;
+                case "^":
+                  lb2 = this.getLabel();
+                  lb3 = this.getLabel();
+                  lb4 = this.getLabel();
+                  this.result.push(new wo.flow.JumpZero(lb2));
+                  this.result.push(new wo.flow.JumpZero(lb3));
+                  this.result.push(new wo.stack.Push(0));
+                  this.result.push(new wo.flow.Jump(endlb));
+                  this.result.push(new wo.flow.Label(lb3));
+                  this.result.push(new wo.stack.Push(1));
+                  this.result.push(new wo.flow.Jump(endlb));
+                  this.result.push(new wo.flow.Label(lb2));
+                  this.result.push(new wo.flow.JumpZero(lb4));
+                  this.result.push(new wo.stack.Push(1));
+                  this.result.push(new wo.flow.Jump(endlb));
+                  this.result.push(new wo.flow.Label(lb4));
+                  this.result.push(new wo.stack.Push(0));
+                  this.result.push(new wo.flow.Jump(endlb));
+              }
+              this.result.push(new wo.flow.Label(endlb));
+              this.result.push(new wo.stack.Push(baipos));
+              this.result.push(new wo.heap.Retrieve);
+              this.result.push(new wo.stack.Duplicate);
+              this.result.push(new wo.stack.Copy(2));
+              this.result.push(new wo.arithmetic.Multiply);
+              this.result.push(new wo.stack.Push(pos));
+              this.result.push(new wo.heap.Retrieve);
+              this.result.push(new wo.arithmetic.Add);
+              this.result.push(new wo.stack.Push(pos));
+              this.result.push(new wo.stack.Swap);
+              this.result.push(new wo.heap.Store);
+              this.result.push(new wo.stack.Push(2));
+              this.result.push(new wo.arithmetic.Multiply);
+              this.result.push(new wo.stack.Slide(1));
+              this.result.push(new wo.stack.Push(baipos));
+              this.result.push(new wo.stack.Swap);
+              this.result.push(new wo.heap.Store);
+              this.result.push(new wo.stack.Push(2));
+              this.result.push(new wo.arithmetic.Divide);
+              this.result.push(new wo.stack.Swap);
+              this.result.push(new wo.stack.Push(2));
+              this.result.push(new wo.arithmetic.Divide);
+              this.result.push(new wo.stack.Duplicate);
+              endlb2 = this.getLabel();
+              this.result.push(new wo.flow.JumpZero(endlb2));
+              this.result.push(new wo.flow.Jump(lb));
+              this.result.push(new wo.flow.Label(endlb2));
+              endlb3 = this.getLabel();
+              this.result.push(new wo.stack.Copy(1));
+              this.result.push(new wo.flow.JumpZero(endlb3));
+              this.result.push(new wo.flow.Jump(lb));
+              this.result.push(new wo.flow.Label(endlb3));
+              if (v == null) {
+                this.result.push(new wo.stack.Push(pos));
+                this.result.push(new wo.stack.Slide(2));
+                this.result.push(new wo.stack.Retrieve);
+              } else {
+                this.result.push(new wo.stack.Discard);
+                this.result.push(new wo.stack.Discard);
+                return;
+              }
+              /*
+              @result.push new wo.stack.Push -101
+              @result.push new wo.stack.Push 0
+              @onstack new idtm.Calc1 "to_number",obj.val1
+              @onstack new idtm.Calc1 "to_number",obj.val2
+              lb=@getLabel()
+              @result.push new wo.flow.Label lb
+              # スタック状況: * [-101] ... [result] [val1] [val2]
+              @result.push new wo.stack.Duplicate
+              @result.push new wo.stack.Push 2
+              @result.push new wo.arithmetic.Modulo
+              # スタック状況: * [-101] ... [result] [val1] [val2] [val2%2]
+              @result.push new wo.stack.Copy 2
+              @result.push new wo.stack.Push 2
+              @result.push new wo.arithmetic.Modulo
+              # スタック状況: * [-101] ... [result] [val1] [val2] [val2%2] [val1%1]
+              endlb=@getLabel()
+              endlb2=@getLabel()
+              enendlb=@getLabel()
+              switch obj.punc
+                  when "|"
+                      # 両方0なら0,他は1
+                      lb2=@getLabel()
+                      @result.push new wo.stack.Push 0
+                      @result.push new wo.stack.Swap
+                      # スタック状況: * [-101] ... [result] [val1] [val2] [val2%2] [0] [val1%2]
+                      @result.push new wo.flow.JumpZero lb2
+                      @result.push new wo.stack.Push 1
+                      @result.push new wo.arithmetic.Add
+                      @result.push new wo.stack.Slide 1
+                      # スタック状況: * [-101] ... [result] [val1] [val2] [1]
+                      @result.push new wo.flow.Jump enendlb
+                      @result.push new wo.flow.Label lb2
+                      # val1が0だったとき
+                      @result.push new wo.stack.Swap
+                      # スタック状況: * [-101] ... [result] [val1] [val2] [0] [val2%2]
+                      @result.push new wo.flow.JumpZero enendlb
+                      @result.push new wo.stack.Push 1
+                      @result.push new wo.arithmetic.Add
+                      # スタック状況: * [-101] ... [result] [val1] [val2] [1]
+              @result.push new wo.flow.Label enendlb
+              # スタック状況: * [-101] ... [result] [val1] [val2] [0or1] 
+              @result.push new wo.stack.Copy 3
+              @result.push new wo.stack.Push 2
+              @result.push new wo.arithmetic.Multiply
+              @result.push new wo.arithmetic.Add
+              # スタック状況: * [-101] ... [result] [val1] [val2] [2*result+(0or1)] 
+              @result.push new wo.stack.Push -100
+              @result.push new wo.stack.Swap
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] 
+              # [-100]: この下3つを消していいフラグ [-101]: 消すのはここで終了フラグ
+              @result.push new wo.stack.Copy 3
+              @result.push new wo.stack.Push 2
+              @result.push new wo.arithmetic.Divide
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [val1/2]
+              @result.push new wo.stack.Duplicate
+              @result.push new wo.flow.JumpZero endlb # 0だったら抜けるかも
+              @result.push new wo.stack.Copy 3
+              @result.push new wo.stack.Push 2
+              @result.push new wo.arithmetic.Divide
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [val1/2] [val2/2]
+              @result.push new wo.flow.Jump lb
+              @result.push new wo.flow.Label endlb
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [0]
+              @result.push new wo.stack.Copy 3
+              @result.push new wo.stack.Push 2
+              @result.push new wo.arithmetic.Divide
+              @result.push new wo.stack.Duplicate
+              @result.push new wo.flow.JumpZero endlb2 # 0だったら抜ける
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [0] [val2/2]
+              @result.push new wo.flow.Jump lb
+              @result.push new wo.flow.Label endlb2
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100] [2*result+(0or1)] [0] [0]
+              # 結果を保存
+              pos=null
+              if v?
+                  pos=@allocHeap v
+              else
+                  tmpv=new idtm.Variable
+                  tmpv.type=tmpv.TYPE_NUMBER
+                  pos=@allocHeap tmpv
+              @result.push new wo.stack.Push pos
+              @result.push new wo.stack.Copy 3
+              @result.push new wo.heap.Store
+              # 片付けしていく
+              @result.push new wo.stack.Slide 2
+              @result.push new wo.stack.Discard
+              # スタック状況: * [-101] ... [result] [val1] [val2] [-100]
+              lb2=@getLabel()
+              @result.push new wo.flow.Label lb2
+              # スタック状況: * ... [-100/-101]
+              @result.push new wo.stack.Push 101
+              @result.push new wo.arithmetic.Add
+              # スタック状況: * ... [1/0]
+              lb3=@getLabel()
+              @result.push new wo.flow.JumpZero lb3
+              # -100だった・・・下の3つを抜く
+              # スタック状況: * [-101] ... [result] [val1] [val2]
+              @result.push new wo.stack.Slide 2
+              @result.push new wo.stack.Discard
+              @result.push new wo.flow.Jump lb2
+              @result.push new wo.flow.Label lb3
+              # スタック状況: *
+              unless v?
+                  # スタックにのせる
+                  @result.push new wo.stack.Push pos
+                  @result.push new wo.heap.Retrieve
+              else
+                  return
+              */
+
           }
         } else if (obj instanceof idtm.Call) {
           if (obj.func instanceof idtm.NativeFunc) {
